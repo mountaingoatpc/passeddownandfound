@@ -1,0 +1,46 @@
+# Node / Bun
+node_modules/
+bun.lock
+
+# Environment files (secrets) -- keep .env.example checked in
+.env
+.env.*
+!.env.example
+
+# Byte-compiled / optimized
+__pycache__/
+*.py[codz]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.venv
+venv/
+
+# Vite
+.vite/
+
+# Uploads
+backend/uploads/
+uploads/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ruff
+.ruff_cache/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

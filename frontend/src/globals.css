@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+	--font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+	--background: 38 33% 96%;
+	--foreground: 24 20% 18%;
+	--card: 0 0% 100%;
+	--card-foreground: 24 20% 18%;
+	--primary: 210 45% 38%;
+	--primary-foreground: 0 0% 100%;
+	--secondary: 38 25% 92%;
+	--secondary-foreground: 24 20% 18%;
+	--muted: 38 20% 94%;
+	--muted-foreground: 24 10% 45%;
+	--destructive: 0 72% 51%;
+	--destructive-foreground: 0 0% 100%;
+	--success: 142 45% 38%;
+	--success-foreground: 0 0% 100%;
+	--border: 38 18% 88%;
+	--input: 38 18% 88%;
+	--ring: 210 45% 38%;
+	--radius: 0.75rem;
+}
+
+* {
+	border-color: hsl(var(--border));
+}
+
+body {
+	background-color: hsl(var(--background));
+	color: hsl(var(--foreground));
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+.safe-top {
+	padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+
+.safe-bottom {
+	padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+input[type="number"] {
+	-moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}

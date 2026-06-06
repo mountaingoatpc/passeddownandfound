@@ -1,0 +1,106 @@
+version: "3"
+
+tasks:
+  install:
+    desc: Install all dependencies (backend + frontend)
+    cmds:
+      - task: backend:install
+      - task: frontend:install
+
+  backend:install:
+    desc: Install backend dependencies with uv
+    dir: backend
+    cmds:
+      - uv sync --extra dev
+
+  backend:lint:
+    desc: Run ruff linter
+    dir: backend
+    cmds:
+      - uv run ruff check .
+
+  backend:format:
+    desc: Format backend code with ruff
+    dir: backend
+    cmds:
+      - uv run ruff format .
+
+  backend:check:
+    desc: Run both lint and format check
+    dir: backend
+    cmds:
+      - uv run ruff check .
+      - uv run ruff format --check .
+
+  api_service:dev:
+    desc: "Run API server locally. Usage: task api_service:dev [ENV=local]"
+    dir: backend
+    dotenv:
+      - '.env.{{.ENV | default "local"}}'
+    cmds:
+      - uv run python -m api_service.api
+
+  frontend:install:
+    desc: Install frontend dependencies with bun
+    dir: frontend
+    cmds:
+      - bun install
+
+  frontend:dev:
+    desc: Run frontend dev server
+    dir: frontend
+    cmds:
+      - bun run dev
+
+  frontend:build:
+    desc: Build frontend for production
+    dir: frontend
+    cmds:
+      - bun run build
+
+  frontend:check:
+    desc: Run Biome check
+    dir: frontend
+    cmds:
+      - bun run check
+
+  lint:
+    desc: Run all linters (backend + frontend)
+    cmds:
+      - task: backend:check
+      - task: frontend:check
+
+  db:create:
+    desc: Start a local PostgreSQL container (Docker)
+    cmds:
+      - docker run -d --name passeddownandfound-db -e POSTGRES_DB=passeddownandfound -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16
+      - echo "Waiting for Postgres to be ready..."
+      - sleep 3
+    status:
+      - docker ps --filter name=passeddownandfound-db -q | grep -q .
+
+  db:start:
+    desc: Start the local PostgreSQL container (if stopped)
+    cmds:
+      - docker start passeddownandfound-db
+
+  db:stop:
+    desc: Stop the local PostgreSQL container
+    cmds:
+      - docker stop passeddownandfound-db
+
+  db:deploy:
+    desc: "Create database tables (idempotent). Usage: task db:deploy [ENV=local]"
+    dir: backend
+    dotenv:
+      - '.env.{{.ENV | default "local"}}'
+    cmds:
+      - uv run python scripts/deploy_tables.py
+
+  db:reset:
+    desc: "Drop and recreate all tables (DESTRUCTIVE). Usage: task db:reset [ENV=local]"
+    dir: backend
+    dotenv:
+      - '.env.{{.ENV | default "local"}}'
+    cmds:
+      - uv run python scripts/deploy_tables.py --reset
