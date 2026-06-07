@@ -41,6 +41,9 @@ function InventoryPage() {
 
 	const goToAddItem = () => navigate({ to: "/inventory/new" });
 
+	const goToEditItem = (itemId: string) =>
+		navigate({ to: "/inventory/$itemId", params: { itemId } });
+
 	return (
 		<div className="min-h-dvh">
 			<AppHeader
@@ -114,7 +117,16 @@ function InventoryPage() {
 										return (
 											<tr
 												key={item.uuid}
-												className="border-b border-[hsl(var(--border))] last:border-0 hover:bg-[hsl(var(--muted))]/30"
+												onClick={() => goToEditItem(item.uuid)}
+												onKeyDown={(e) => {
+													if (e.key === "Enter" || e.key === " ") {
+														e.preventDefault();
+														goToEditItem(item.uuid);
+													}
+												}}
+												tabIndex={0}
+												role="link"
+												className="cursor-pointer border-b border-[hsl(var(--border))] last:border-0 hover:bg-[hsl(var(--muted))]/30 focus-visible:bg-[hsl(var(--muted))]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[hsl(var(--ring))]"
 											>
 												<td className="px-3 py-3">
 													{imageSrc ? (

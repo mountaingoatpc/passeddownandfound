@@ -38,7 +38,13 @@ def _serialize_item(row: dict) -> InventoryItemResponse:
     return InventoryItemResponse(
         uuid=str(row["uuid"]),
         name=row["name"],
+        category=row.get("category") or "",
         description=row["description"] or "",
+        condition=row.get("condition") or "",
+        quantity=int(row.get("quantity", 1)),
+        weight_pounds=int(row.get("weight_pounds", 0)),
+        weight_ounces=float(row.get("weight_ounces", 0)),
+        starting_bid=float(row.get("starting_bid", 0)),
         cost=float(row["cost"]),
         projected_sale_price=float(row["projected_sale_price"]),
         actual_sale_price=float(row["actual_sale_price"]) if row["actual_sale_price"] is not None else None,
@@ -155,7 +161,13 @@ async def create_inventory_item(
     result = inventory_table.create(
         owner_uuid=current_user["uuid"],
         name=request.name.strip(),
+        category=request.category.strip(),
         description=request.description.strip(),
+        condition=request.condition.strip(),
+        quantity=request.quantity,
+        weight_pounds=request.weight_pounds,
+        weight_ounces=request.weight_ounces,
+        starting_bid=request.starting_bid,
         cost=request.cost,
         projected_sale_price=request.projected_sale_price,
         actual_sale_price=request.actual_sale_price,
@@ -191,8 +203,12 @@ async def update_inventory_item(
     updates = request.model_dump(exclude_unset=True)
     if "name" in updates and updates["name"]:
         updates["name"] = updates["name"].strip()
+    if "category" in updates and updates["category"] is not None:
+        updates["category"] = updates["category"].strip()
     if "description" in updates and updates["description"] is not None:
         updates["description"] = updates["description"].strip()
+    if "condition" in updates and updates["condition"] is not None:
+        updates["condition"] = updates["condition"].strip()
 
     result = inventory_table.update(item_uuid, current_user["uuid"], updates)
     if not result:

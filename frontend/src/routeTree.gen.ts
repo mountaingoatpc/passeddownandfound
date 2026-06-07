@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedInventoryRouteRouteImport } from './routes/_authenticated/inventory/route'
 import { Route as AuthenticatedInventoryIndexRouteImport } from './routes/_authenticated/inventory/index'
 import { Route as AuthenticatedInventoryNewRouteImport } from './routes/_authenticated/inventory/new'
+import { Route as AuthenticatedInventoryItemIdRouteImport } from './routes/_authenticated/inventory/$itemId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -48,17 +49,25 @@ const AuthenticatedInventoryNewRoute =
     path: '/new',
     getParentRoute: () => AuthenticatedInventoryRouteRoute,
   } as any)
+const AuthenticatedInventoryItemIdRoute =
+  AuthenticatedInventoryItemIdRouteImport.update({
+    id: '/$itemId',
+    path: '/$itemId',
+    getParentRoute: () => AuthenticatedInventoryRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/inventory': typeof AuthenticatedInventoryRouteRouteWithChildren
+  '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/inventory/new': typeof AuthenticatedInventoryNewRoute
   '/inventory/': typeof AuthenticatedInventoryIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/inventory/new': typeof AuthenticatedInventoryNewRoute
   '/inventory': typeof AuthenticatedInventoryIndexRoute
 }
@@ -68,20 +77,28 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/inventory': typeof AuthenticatedInventoryRouteRouteWithChildren
+  '/_authenticated/inventory/$itemId': typeof AuthenticatedInventoryItemIdRoute
   '/_authenticated/inventory/new': typeof AuthenticatedInventoryNewRoute
   '/_authenticated/inventory/': typeof AuthenticatedInventoryIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/inventory' | '/inventory/new' | '/inventory/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/inventory'
+    | '/inventory/$itemId'
+    | '/inventory/new'
+    | '/inventory/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/inventory/new' | '/inventory'
+  to: '/' | '/login' | '/inventory/$itemId' | '/inventory/new' | '/inventory'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/login'
     | '/_authenticated/inventory'
+    | '/_authenticated/inventory/$itemId'
     | '/_authenticated/inventory/new'
     | '/_authenticated/inventory/'
   fileRoutesById: FileRoutesById
@@ -136,16 +153,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedInventoryNewRouteImport
       parentRoute: typeof AuthenticatedInventoryRouteRoute
     }
+    '/_authenticated/inventory/$itemId': {
+      id: '/_authenticated/inventory/$itemId'
+      path: '/$itemId'
+      fullPath: '/inventory/$itemId'
+      preLoaderRoute: typeof AuthenticatedInventoryItemIdRouteImport
+      parentRoute: typeof AuthenticatedInventoryRouteRoute
+    }
   }
 }
 
 interface AuthenticatedInventoryRouteRouteChildren {
+  AuthenticatedInventoryItemIdRoute: typeof AuthenticatedInventoryItemIdRoute
   AuthenticatedInventoryNewRoute: typeof AuthenticatedInventoryNewRoute
   AuthenticatedInventoryIndexRoute: typeof AuthenticatedInventoryIndexRoute
 }
 
 const AuthenticatedInventoryRouteRouteChildren: AuthenticatedInventoryRouteRouteChildren =
   {
+    AuthenticatedInventoryItemIdRoute: AuthenticatedInventoryItemIdRoute,
     AuthenticatedInventoryNewRoute: AuthenticatedInventoryNewRoute,
     AuthenticatedInventoryIndexRoute: AuthenticatedInventoryIndexRoute,
   }

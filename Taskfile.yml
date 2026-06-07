@@ -104,3 +104,12 @@ tasks:
       - '.env.{{.ENV | default "local"}}'
     cmds:
       - uv run python scripts/deploy_tables.py --reset
+
+  db:psql:
+    desc: "Open psql shell. Usage: task db:psql [ENV=local]"
+    dir: backend
+    interactive: true
+    dotenv:
+      - '.env.{{.ENV | default "local"}}'
+    cmds:
+      - PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}"

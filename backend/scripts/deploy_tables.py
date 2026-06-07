@@ -11,6 +11,15 @@ logger = logging.getLogger(__name__)
 
 ALL_TABLES = [UserLoginTable(), InventoryItemTable()]
 
+INVENTORY_ITEM_MIGRATIONS = [
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS condition TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS weight_pounds INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS weight_ounces REAL NOT NULL DEFAULT 0",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS starting_bid REAL NOT NULL DEFAULT 0",
+]
+
 
 def deploy(reset: bool = False) -> None:
     db = Database()
@@ -27,6 +36,11 @@ def deploy(reset: bool = False) -> None:
         for table in ALL_TABLES:
             db.create_table(table)
             logger.info(f"  Created: {table.fully_qualified_name}")
+
+        logger.info("Applying migrations...")
+        for migration in INVENTORY_ITEM_MIGRATIONS:
+            db.execute(migration)
+            logger.info(f"  Applied: {migration}")
 
         db.connect().commit()
     logger.info("Schema deployment complete.")
