@@ -12,10 +12,8 @@ COPY scripts/ ./scripts/
 RUN mkdir -p uploads
 
 ENV PYTHONUNBUFFERED=1
-ENV PORT=8080
-EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import os; import urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\",\"8080\")}/health')"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python -c "import os; import urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ[\"PORT\"]}/health')"
 
-CMD sh -c "python scripts/deploy_tables.py && uvicorn api_service.api:app --host 0.0.0.0 --port ${PORT:-8080}"
+CMD python scripts/deploy_tables.py && uvicorn api_service.api:app --host 0.0.0.0 --port $PORT

@@ -45,10 +45,19 @@ export async function fetchApi<T>(
 		headers.Authorization = `Bearer ${token}`;
 	}
 
-	const response = await fetch(`${apiBaseUrl}${endpoint}`, {
-		...options,
-		headers,
-	});
+	let response: Response;
+	try {
+		response = await fetch(`${apiBaseUrl}${endpoint}`, {
+			...options,
+			headers,
+		});
+	} catch {
+		const hint =
+			apiBaseUrl === "/api"
+				? "API URL is not configured. Set VITE_API_URL to your backend URL in Railway."
+				: `Could not reach the API at ${apiBaseUrl}. Check that the backend is running and CORS is configured.`;
+		throw new ApiError(0, "Network Error", hint);
+	}
 
 	if (response.status === 401) {
 		removeAuthToken();
@@ -68,5 +77,24 @@ export async function fetchApi<T>(
 	}
 
 	const text = await response.text();
-	return text ? (JSON.parse(text) as T) : ({} as T);
+	if (!text) {
+		return {} as T;
+	}
+
+	try {
+		return JSON.parse(text) as T;
+	} catch {
+		if (text.trimStart().startsWith("<!")) {
+			throw new ApiError(
+				response.status,
+				response.statusText,
+				"Received HTML instead of JSON. Set VITE_API_URL to your backend URL in Railway and redeploy the frontend.",
+			);
+		}
+		throw new ApiError(
+			response.status,
+			response.statusText,
+			"Invalid response from API",
+		);
+	}
 }

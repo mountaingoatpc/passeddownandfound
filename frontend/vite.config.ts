@@ -9,6 +9,17 @@ export default defineConfig({
 		TanStackRouterVite({ routesDirectory: "./src/routes" }),
 		react(),
 		tailwindcss(),
+		{
+			name: "runtime-config",
+			configureServer(server) {
+				server.middlewares.use("/config.js", (_req, res) => {
+					res.setHeader("Content-Type", "application/javascript");
+					res.end(
+						`window.__RUNTIME_CONFIG__=${JSON.stringify({ apiBaseUrl: "/api" })}`,
+					);
+				});
+			},
+		},
 	],
 	resolve: {
 		alias: {

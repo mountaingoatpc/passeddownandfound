@@ -22,9 +22,10 @@ def get_pool() -> ConnectionPool:
             min_size=2,
             max_size=10,
             open=True,
-            kwargs={"row_factory": dict_row},
+            kwargs={"row_factory": dict_row, "connect_timeout": 10},
             check=ConnectionPool.check_connection,
             max_idle=300,
+            timeout=10,
         )
     return _pool
 

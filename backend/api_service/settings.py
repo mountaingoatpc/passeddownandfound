@@ -4,6 +4,16 @@ from urllib.parse import quote
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def normalize_database_url(url: str) -> str:
+    """Normalize Railway/Heroku-style DATABASE_URL for psycopg."""
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    if "sslmode=" not in url and ("railway" in url or "rlwy.net" in url):
+        separator = "&" if "?" in url else "?"
+        url = f"{url}{separator}sslmode=require"
+    return url
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -29,7 +39,7 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         env_url = os.environ.get("DATABASE_URL")
         if env_url:
-            return env_url
+            return normalize_database_url(env_url)
         encoded_password = quote(self.db_password, safe="")
         return (
             f"postgresql://{self.db_user}:{encoded_password}"

@@ -21,4 +21,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD bun -e "fetch('http://localhost:' + (process.env.PORT || '3000')).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
-CMD ["sh", "-c", "bunx serve dist -s -l tcp://0.0.0.0:${PORT:-3000}"]
+CMD ["sh", "-c", "bun -e \"const url=process.env.VITE_API_URL||process.env.API_URL||'/api';require('fs').writeFileSync('dist/config.js','window.__RUNTIME_CONFIG__='+JSON.stringify({apiBaseUrl:url}))\" && bunx serve dist -s -l tcp://0.0.0.0:${PORT:-3000}"]
