@@ -51,6 +51,7 @@ function EditItemPage() {
 				cost: values.cost,
 				projected_sale_price: values.projected_sale_price,
 				actual_sale_price: values.actual_sale_price,
+				ai_evidence: values.aiEvidence,
 				...(imageUrl !== undefined ? { image_url: imageUrl } : {}),
 			});
 		},
@@ -112,6 +113,7 @@ function EditItemPage() {
 						projected_sale_price: item.projected_sale_price,
 						actual_sale_price: item.actual_sale_price,
 						imagePreviewUrl: resolveImageUrl(item.image_url),
+						aiEvidence: item.ai_evidence,
 					}}
 					onSubmit={(values) => {
 						setError(null);

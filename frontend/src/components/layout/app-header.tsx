@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { LogOut, Package } from "lucide-react";
+import { LogOut } from "lucide-react";
+import { AppLogo } from "@/components/layout/app-logo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -15,10 +16,10 @@ export function AppHeader({ title, action }: AppHeaderProps) {
 		<header className="sticky top-0 z-10 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))]/95 backdrop-blur supports-[backdrop-filter]:bg-[hsl(var(--card))]/80">
 			<div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 safe-top">
 				<div className="flex min-w-0 items-center gap-2">
-					<Package className="h-5 w-5 shrink-0 text-[hsl(var(--primary))]" />
+					<AppLogo size="sm" />
 					<div className="min-w-0">
 						<p className="truncate text-xs text-[hsl(var(--muted-foreground))]">
-							Passed Down and Found
+							atticory
 						</p>
 						<h1 className="truncate text-lg font-semibold">{title}</h1>
 					</div>

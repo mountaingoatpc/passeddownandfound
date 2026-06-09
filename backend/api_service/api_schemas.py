@@ -21,6 +21,21 @@ class AuthResponse(BaseModel):
     user: UserResponse
 
 
+class ComparableListingResponse(BaseModel):
+    platform: str
+    title: str
+    price: float | None = None
+    url: str | None = None
+    notes: str = ""
+
+
+class ItemAiEvidence(BaseModel):
+    comparable_listings: list[ComparableListingResponse] = Field(default_factory=list)
+    platform_estimates: dict[str, float] = Field(default_factory=dict)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    reasoning: str = ""
+
+
 class CreateInventoryItemRequest(BaseModel):
     name: str = Field(min_length=1)
     category: str = ""
@@ -34,6 +49,7 @@ class CreateInventoryItemRequest(BaseModel):
     projected_sale_price: float = Field(ge=0)
     actual_sale_price: float | None = Field(default=None, ge=0)
     image_url: str | None = None
+    ai_evidence: ItemAiEvidence | None = None
 
 
 class UpdateInventoryItemRequest(BaseModel):
@@ -49,6 +65,7 @@ class UpdateInventoryItemRequest(BaseModel):
     projected_sale_price: float | None = Field(default=None, ge=0)
     actual_sale_price: float | None = Field(default=None, ge=0)
     image_url: str | None = None
+    ai_evidence: ItemAiEvidence | None = None
 
 
 class InventoryItemResponse(BaseModel):
@@ -65,6 +82,7 @@ class InventoryItemResponse(BaseModel):
     projected_sale_price: float
     actual_sale_price: float | None
     image_url: str | None
+    ai_evidence: ItemAiEvidence | None = None
     owner_uuid: str
     created_at: str
     updated_at: str
@@ -72,3 +90,16 @@ class InventoryItemResponse(BaseModel):
 
 class UploadResponse(BaseModel):
     image_url: str
+
+
+class ItemAnalysisResponse(BaseModel):
+    name: str
+    category: str
+    description: str
+    condition_suggestion: str
+    projected_sale_price: float
+    starting_bid_suggestion: float
+    platform_estimates: dict[str, float] = Field(default_factory=dict)
+    comparable_listings: list[ComparableListingResponse] = Field(default_factory=list)
+    confidence: float
+    reasoning: str

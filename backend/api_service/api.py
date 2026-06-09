@@ -1,16 +1,21 @@
+import json
 import logging
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
+import httpx
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from api_service.api_schemas import (
     AuthResponse,
     CreateInventoryItemRequest,
     InventoryItemResponse,
+    ItemAiEvidence,
+    ItemAnalysisResponse,
     LoginRequest,
     RegisterRequest,
     UpdateInventoryItemRequest,
@@ -34,6 +39,12 @@ user_table = UserLoginTable()
 inventory_table = InventoryItemTable()
 
 
+def _serialize_ai_evidence(raw: dict | None) -> ItemAiEvidence | None:
+    if not raw:
+        return None
+    return ItemAiEvidence.model_validate(raw)
+
+
 def _serialize_item(row: dict) -> InventoryItemResponse:
     return InventoryItemResponse(
         uuid=str(row["uuid"]),
@@ -49,6 +60,7 @@ def _serialize_item(row: dict) -> InventoryItemResponse:
         projected_sale_price=float(row["projected_sale_price"]),
         actual_sale_price=float(row["actual_sale_price"]) if row["actual_sale_price"] is not None else None,
         image_url=row["image_url"],
+        ai_evidence=_serialize_ai_evidence(row.get("ai_evidence")),
         owner_uuid=str(row["owner_uuid"]),
         created_at=row["created_at"].isoformat(),
         updated_at=row["updated_at"].isoformat(),
@@ -62,7 +74,7 @@ async def lifespan(app: FastAPI):
     close_pool()
 
 
-app = FastAPI(title="Passed Down and Found API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="atticory API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -136,6 +148,127 @@ async def upload_image(
     return UploadResponse(image_url=f"/uploads/{filename}")
 
 
+@app.post(
+    "/inventory/analyze",
+    response_model=ItemAnalysisResponse,
+    openapi_extra=route_metadata(Resource.INVENTORY, Permission.READ),
+)
+async def analyze_inventory_item(
+    file: UploadFile = File(...),
+    additional_context: str | None = Form(default=None),
+    current_user: dict = Depends(get_current_user),
+):
+    del current_user
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image must be under 10MB")
+
+    analyze_url = f"{settings.ai_service_url.rstrip('/')}/analyze-item"
+    form_data = {}
+    if additional_context and additional_context.strip():
+        form_data["additional_context"] = additional_context.strip()
+
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                analyze_url,
+                files={
+                    "file": (
+                        file.filename or "image.jpg",
+                        content,
+                        file.content_type,
+                    )
+                },
+                data=form_data,
+            )
+    except httpx.RequestError as exc:
+        logger.exception("AI service request failed")
+        raise HTTPException(status_code=502, detail="AI service is unavailable") from exc
+
+    if response.status_code >= 400:
+        detail = "AI analysis failed"
+        try:
+            payload = response.json()
+            if isinstance(payload, dict) and payload.get("detail"):
+                detail = str(payload["detail"])
+        except ValueError:
+            pass
+        raise HTTPException(status_code=response.status_code, detail=detail)
+
+    return ItemAnalysisResponse.model_validate(response.json())
+
+
+@app.post(
+    "/inventory/analyze/stream",
+    openapi_extra=route_metadata(Resource.INVENTORY, Permission.READ),
+)
+async def analyze_inventory_item_stream(
+    file: UploadFile = File(...),
+    additional_context: str | None = Form(default=None),
+    current_user: dict = Depends(get_current_user),
+):
+    del current_user
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image must be under 10MB")
+
+    analyze_url = f"{settings.ai_service_url.rstrip('/')}/analyze-item/stream"
+    form_data = {}
+    if additional_context and additional_context.strip():
+        form_data["additional_context"] = additional_context.strip()
+
+    async def proxy_stream():
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                async with client.stream(
+                    "POST",
+                    analyze_url,
+                    files={
+                        "file": (
+                            file.filename or "image.jpg",
+                            content,
+                            file.content_type,
+                        )
+                    },
+                    data=form_data,
+                ) as response:
+                    if response.status_code >= 400:
+                        detail = "AI analysis failed"
+                        try:
+                            payload = await response.aread()
+                            body = json.loads(payload)
+                            if isinstance(body, dict) and body.get("detail"):
+                                detail = str(body["detail"])
+                        except (ValueError, TypeError):
+                            pass
+                        yield f"event: error\ndata: {json.dumps({'message': detail})}\n\n"
+                        return
+
+                    async for chunk in response.aiter_bytes():
+                        yield chunk
+        except httpx.RequestError:
+            logger.exception("AI service stream request failed")
+            yield 'event: error\ndata: {"message": "AI service is unavailable"}\n\n'
+
+    return StreamingResponse(
+        proxy_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @app.get(
     "/inventory",
     response_model=list[InventoryItemResponse],
@@ -172,6 +305,7 @@ async def create_inventory_item(
         projected_sale_price=request.projected_sale_price,
         actual_sale_price=request.actual_sale_price,
         image_url=request.image_url,
+        ai_evidence=request.ai_evidence.model_dump() if request.ai_evidence else None,
     )
     if not result:
         raise HTTPException(status_code=500, detail="Failed to create item")
@@ -209,6 +343,8 @@ async def update_inventory_item(
         updates["description"] = updates["description"].strip()
     if "condition" in updates and updates["condition"] is not None:
         updates["condition"] = updates["condition"].strip()
+    if "ai_evidence" in updates and updates["ai_evidence"] is not None:
+        updates["ai_evidence"] = ItemAiEvidence.model_validate(updates["ai_evidence"]).model_dump()
 
     result = inventory_table.update(item_uuid, current_user["uuid"], updates)
     if not result:

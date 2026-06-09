@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { AppLogo } from "@/components/layout/app-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
@@ -45,12 +46,11 @@ function LoginPage() {
 	return (
 		<div className="flex min-h-dvh flex-col items-center justify-center px-4 safe-top safe-bottom">
 			<div className="w-full max-w-sm space-y-6">
-				<div className="text-center">
-					<h1 className="text-2xl font-bold tracking-tight">
-						Passed Down and Found
-					</h1>
+				<div className="flex flex-col items-center text-center">
+					<AppLogo size="lg" className="mb-4" />
+					<h1 className="text-2xl font-bold tracking-tight">atticory</h1>
 					<p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-						Inventory for treasured finds
+						Inventory from the attic and beyond
 					</p>
 				</div>
 

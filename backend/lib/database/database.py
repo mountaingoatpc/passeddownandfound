@@ -3,6 +3,7 @@ from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
+from psycopg.types.json import Json
 from psycopg_pool import ConnectionPool
 from pydantic import BaseModel
 
@@ -10,6 +11,13 @@ from lib.database.schemas import Record, Table
 
 logger = logging.getLogger(__name__)
 _pool: ConnectionPool | None = None
+
+
+def _adapt_jsonb_dict(params: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: Json(value) if isinstance(value, dict) else value
+        for key, value in params.items()
+    }
 
 
 def get_pool() -> ConnectionPool:
@@ -62,11 +70,14 @@ class Database(BaseModel):
     def execute(self, sql: str, params=None, fetch: bool = False) -> list[dict[str, Any]] | None:
         conn = self.connect()
         with conn.cursor() as cursor:
+            if isinstance(params, dict):
+                params = _adapt_jsonb_dict(params)
             cursor.execute(sql, params)
-            if fetch:
-                return [dict(row) for row in cursor.fetchall()]
+            result = (
+                [dict(row) for row in cursor.fetchall()] if fetch else None
+            )
             conn.commit()
-            return None
+            return result
 
     def insert(self, table: Table, record: Record) -> dict[str, Any] | None:
         columns = list(record.data.keys())
@@ -77,7 +88,7 @@ class Database(BaseModel):
         )
         conn = self.connect()
         with conn.cursor() as cursor:
-            cursor.execute(sql, record.data)
+            cursor.execute(sql, _adapt_jsonb_dict(record.data))
             result = cursor.fetchone()
             conn.commit()
             return dict(result) if result else None

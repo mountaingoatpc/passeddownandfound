@@ -1,6 +1,6 @@
-# Passed Down and Found
+# atticory
 
-Inventory management for treasured finds — sign in, photograph items on mobile, and track costs and sale prices.
+Inventory from the attic and beyond — sign in, photograph items on mobile, and track costs and sale prices.
 
 ## Stack
 
@@ -23,11 +23,16 @@ task db:deploy
 # Run API (terminal 1) — http://localhost:8091
 task api_service:dev
 
-# Run frontend (terminal 2) — http://localhost:5173
+# Run AI service (terminal 2) — http://localhost:8001
+task ai_service:dev
+
+# Run frontend (terminal 3) — http://localhost:5173
 task frontend:dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173). The frontend proxies API requests to [http://localhost:8091](http://localhost:8091). Register an account, then use **Inventory** to browse items and **Add Item** to photograph and catalog finds.
+
+Set `AI_SERVICE_OPENAI_API_KEY` in `backend/.env.local` to enable **Analyze with AI** on the Add Item page.
 
 ## Mobile Photo Capture
 

@@ -39,6 +39,7 @@ function AddItemPage() {
 				projected_sale_price: values.projected_sale_price,
 				actual_sale_price: values.actual_sale_price,
 				image_url: imageUrl,
+				ai_evidence: values.aiEvidence,
 			});
 		},
 		onSuccess: async () => {

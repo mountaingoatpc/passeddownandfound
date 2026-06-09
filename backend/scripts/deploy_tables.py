@@ -18,6 +18,7 @@ INVENTORY_ITEM_MIGRATIONS = [
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS weight_pounds INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS weight_ounces REAL NOT NULL DEFAULT 0",
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS starting_bid REAL NOT NULL DEFAULT 0",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS ai_evidence JSONB",
 ]
 
 

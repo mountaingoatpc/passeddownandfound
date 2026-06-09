@@ -1,6 +1,6 @@
 import { getConfig } from "@/config";
 
-const AUTH_TOKEN_KEY = "passeddownandfound_token";
+const AUTH_TOKEN_KEY = "atticory_token";
 
 export class ApiError extends Error {
 	status: number;

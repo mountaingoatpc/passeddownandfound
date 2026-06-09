@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     db_host: str = "localhost"
     db_port: int = 5432
-    db_name: str = "passeddownandfound"
+    db_name: str = "atticory"
     db_user: str = "postgres"
     db_password: str = "postgres"
     db_sslmode: str = "prefer"
@@ -34,6 +34,7 @@ class Settings(BaseSettings):
 
     frontend_url: str = "http://localhost:5173"
     uploads_dir: str = "uploads"
+    ai_service_url: str = "http://localhost:8001"
 
     @property
     def database_url(self) -> str:

@@ -60,6 +60,7 @@ class InventoryItemTable(Table):
         Column(name="projected_sale_price", column_type=ColumnType.REAL, nullable=False, default="0"),
         Column(name="actual_sale_price", column_type=ColumnType.REAL, nullable=True),
         Column(name="image_url", column_type=ColumnType.TEXT, nullable=True),
+        Column(name="ai_evidence", column_type=ColumnType.JSONB, nullable=True),
         Column(name="created_at", column_type=ColumnType.TIMESTAMPTZ, default="now()"),
         Column(name="updated_at", column_type=ColumnType.TIMESTAMPTZ, default="now()"),
     ]
@@ -120,6 +121,7 @@ class InventoryItemTable(Table):
         weight_pounds: int = 0,
         weight_ounces: float = 0,
         starting_bid: float = 0,
+        ai_evidence: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
         db = Database()
         with db:
@@ -140,6 +142,7 @@ class InventoryItemTable(Table):
                         "projected_sale_price": projected_sale_price,
                         "actual_sale_price": actual_sale_price,
                         "image_url": image_url,
+                        "ai_evidence": ai_evidence,
                     }
                 ),
             )

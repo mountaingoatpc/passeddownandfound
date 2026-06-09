@@ -141,7 +141,9 @@ function InventoryPage() {
 														</div>
 													)}
 												</td>
-												<td className="px-3 py-3 font-medium">{item.name}</td>
+												<td className="max-w-[12rem] truncate px-3 py-3 font-medium">
+													{item.name}
+												</td>
 												<td className="max-w-xs truncate px-3 py-3 text-[hsl(var(--muted-foreground))]">
 													{item.description || "—"}
 												</td>
