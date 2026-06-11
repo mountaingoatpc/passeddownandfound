@@ -1,3 +1,4 @@
+# Build context: backend/ai_service (Railway Root Directory = backend/ai_service)
 FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -5,7 +6,7 @@ WORKDIR /app
 COPY pyproject.toml ./
 RUN uv pip install --system --no-cache -r pyproject.toml
 
-COPY ai_service/ ./ai_service/
+COPY . ./ai_service/
 
 ENV PYTHONUNBUFFERED=1
 

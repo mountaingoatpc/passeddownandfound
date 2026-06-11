@@ -1,3 +1,6 @@
+# API service only — do not use this file for the AI service.
+# AI service config: /backend/ai_service/railway.toml (Root Directory: backend/ai_service)
+
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "api_service/Dockerfile"

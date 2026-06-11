@@ -1,8 +1,8 @@
-# AI service Railway config (legacy path — prefer /backend/ai_service/railway.toml).
+# AI service Railway config.
 #
 # Railway → AI service → Settings:
 #   Root Directory:     backend/ai_service
-#   Config file path:   /backend/ai_service.railway.toml
+#   Config file path:   /backend/ai_service/railway.toml
 
 [build]
 builder = "DOCKERFILE"
