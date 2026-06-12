@@ -1,15 +1,14 @@
-# Build context: backend/ (Railway Root Directory = backend)
-# Needs lib/, scripts/, and pyproject.toml from the backend monorepo root.
+# Build context: repo root (Railway Root Directory unset or /)
 FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
-COPY pyproject.toml ./
+COPY backend/pyproject.toml ./
 RUN uv pip install --system --no-cache -r pyproject.toml
 
-COPY api_service/ ./api_service/
-COPY lib/ ./lib/
-COPY scripts/ ./scripts/
+COPY backend/api_service/ ./api_service/
+COPY backend/lib/ ./lib/
+COPY backend/scripts/ ./scripts/
 
 RUN mkdir -p uploads
 

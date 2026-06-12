@@ -1,14 +1,12 @@
 # API service Railway config.
 #
 # Railway → API service → Settings:
-#   Root Directory:     backend          ← must be backend, NOT backend/api_service
+#   Root Directory:     (leave empty — repo root)
 #   Config file path:   /backend/railway.toml
-#
-# AI service uses /backend/ai_service/railway.toml with Root Directory: backend/ai_service
 
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "api_service/Dockerfile"
+dockerfilePath = "backend/api_service/Dockerfile"
 watchPatterns = [
   "backend/api_service/**",
   "backend/lib/**",
