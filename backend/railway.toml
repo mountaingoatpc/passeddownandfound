@@ -1,9 +1,20 @@
-# API service only — do not use this file for the AI service.
-# AI service config: /backend/ai_service/railway.toml (Root Directory: backend/ai_service)
+# API service Railway config.
+#
+# Railway → API service → Settings:
+#   Root Directory:     backend          ← must be backend, NOT backend/api_service
+#   Config file path:   /backend/railway.toml
+#
+# AI service uses /backend/ai_service/railway.toml with Root Directory: backend/ai_service
 
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "api_service/Dockerfile"
+watchPatterns = [
+  "backend/api_service/**",
+  "backend/lib/**",
+  "backend/scripts/**",
+  "backend/pyproject.toml",
+]
 
 [deploy]
 restartPolicyType = "ON_FAILURE"
