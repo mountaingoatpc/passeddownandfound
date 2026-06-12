@@ -103,7 +103,7 @@ tasks:
     dotenv:
       - '.env.{{.ENV | default "local"}}'
     cmds:
-      - uv run python scripts/deploy_tables.py
+      - uv run python api_service/scripts/deploy_tables.py
 
   db:reset:
     desc: "Drop and recreate all tables (DESTRUCTIVE). Usage: task db:reset [ENV=local]"
@@ -111,7 +111,7 @@ tasks:
     dotenv:
       - '.env.{{.ENV | default "local"}}'
     cmds:
-      - uv run python scripts/deploy_tables.py --reset
+      - uv run python api_service/scripts/deploy_tables.py --reset
 
   db:psql:
     desc: "Open psql shell. Usage: task db:psql [ENV=local]"

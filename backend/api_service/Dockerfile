@@ -1,14 +1,15 @@
-# Build context: repo root (Railway Root Directory unset or /)
+# Build context: backend/api_service (Railway Root Directory = backend/api_service)
 FROM python:3.12-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
-COPY backend/pyproject.toml ./
+
+COPY pyproject.toml ./
 RUN uv pip install --system --no-cache -r pyproject.toml
 
-COPY backend/api_service/ ./api_service/
-COPY backend/lib/ ./lib/
-COPY backend/scripts/ ./scripts/
+COPY lib/ ./lib/
+COPY scripts/ ./scripts/
+COPY . ./api_service/
 
 RUN mkdir -p uploads
 
