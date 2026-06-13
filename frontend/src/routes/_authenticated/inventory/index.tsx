@@ -113,7 +113,8 @@ function InventoryPage() {
 								</thead>
 								<tbody>
 									{items.map((item) => {
-										const imageSrc = resolveImageUrl(item.image_url);
+										const imageSrc = resolveImageUrl(item.image_urls[0]);
+										const extraCount = item.image_urls.length - 1;
 										return (
 											<tr
 												key={item.uuid}
@@ -130,11 +131,18 @@ function InventoryPage() {
 											>
 												<td className="px-3 py-3">
 													{imageSrc ? (
-														<img
-															src={imageSrc}
-															alt={item.name}
-															className="h-12 w-12 rounded-md object-cover"
-														/>
+														<div className="relative h-12 w-12">
+															<img
+																src={imageSrc}
+																alt={item.name}
+																className="h-12 w-12 rounded-md object-cover"
+															/>
+															{extraCount > 0 && (
+																<span className="absolute -bottom-1 -right-1 rounded-full bg-[hsl(var(--foreground))] px-1.5 py-0.5 text-[10px] font-medium leading-none text-[hsl(var(--background))]">
+																	+{extraCount}
+																</span>
+															)}
+														</div>
 													) : (
 														<div className="flex h-12 w-12 items-center justify-center rounded-md bg-[hsl(var(--muted))] text-xs text-[hsl(var(--muted-foreground))]">
 															No photo

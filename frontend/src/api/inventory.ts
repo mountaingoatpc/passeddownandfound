@@ -14,7 +14,7 @@ export interface InventoryItem {
 	cost: number;
 	projected_sale_price: number;
 	actual_sale_price: number | null;
-	image_url: string | null;
+	image_urls: string[];
 	ai_evidence: ItemAiEvidence | null;
 	owner_uuid: string;
 	created_at: string;
@@ -33,7 +33,7 @@ export interface CreateInventoryItemData {
 	cost: number;
 	projected_sale_price: number;
 	actual_sale_price?: number | null;
-	image_url?: string | null;
+	image_urls?: string[];
 	ai_evidence?: ItemAiEvidence | null;
 }
 

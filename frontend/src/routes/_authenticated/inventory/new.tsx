@@ -7,6 +7,7 @@ import {
 	type ItemFormValues,
 } from "@/components/inventory/item-form";
 import { AppHeader, BackLink } from "@/components/layout/app-header";
+import { resolveItemImageUrls } from "@/lib/upload-item-images";
 
 export const Route = createFileRoute("/_authenticated/inventory/new")({
 	component: AddItemPage,
@@ -19,12 +20,7 @@ function AddItemPage() {
 
 	const createMutation = useMutation({
 		mutationFn: async (values: ItemFormValues) => {
-			let imageUrl: string | null = null;
-
-			if (values.imageFile) {
-				const upload = await inventoryApi.uploadImage(values.imageFile);
-				imageUrl = upload.image_url;
-			}
+			const imageUrls = await resolveItemImageUrls(values.images);
 
 			return inventoryApi.create({
 				name: values.name,
@@ -38,7 +34,7 @@ function AddItemPage() {
 				cost: values.cost,
 				projected_sale_price: values.projected_sale_price,
 				actual_sale_price: values.actual_sale_price,
-				image_url: imageUrl,
+				image_urls: imageUrls,
 				ai_evidence: values.aiEvidence,
 			});
 		},

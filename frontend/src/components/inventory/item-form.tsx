@@ -6,7 +6,10 @@ import {
 	inventoryApi,
 } from "@/api/inventory";
 import { AnalyzeDialog } from "@/components/inventory/analyze-dialog";
-import { CameraCapture } from "@/components/inventory/camera-capture";
+import {
+	MultiImageCapture,
+	type ImageSlot,
+} from "@/components/inventory/multi-image-capture";
 import { ConditionPicker } from "@/components/inventory/condition-picker";
 import { ItemEvidencePanel } from "@/components/inventory/item-evidence-panel";
 import { Button } from "@/components/ui/button";
@@ -15,6 +18,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { isConditionComplete } from "@/lib/condition";
 import { analysisToEvidence, hasAiEvidence } from "@/lib/item-evidence";
+
+export interface ItemFormImage {
+	url: string;
+	file?: File;
+	serverPath?: string;
+}
 
 export interface ItemFormValues {
 	name: string;
@@ -28,14 +37,13 @@ export interface ItemFormValues {
 	cost: number;
 	projected_sale_price: number;
 	actual_sale_price: number | null;
-	imageFile: File | null;
-	removeImage: boolean;
+	images: ItemFormImage[];
 	aiEvidence: ItemAiEvidence | null;
 }
 
 interface ItemFormProps {
 	initialValues?: Partial<ItemFormValues> & {
-		imagePreviewUrl?: string | null;
+		images?: ItemFormImage[];
 		aiEvidence?: ItemAiEvidence | null;
 	};
 	onSubmit: (values: ItemFormValues) => void;
@@ -82,11 +90,9 @@ export function ItemForm({
 			? String(initialValues.actual_sale_price)
 			: "",
 	);
-	const [imageFile, setImageFile] = useState<File | null>(null);
-	const [previewUrl, setPreviewUrl] = useState<string | null>(
-		initialValues?.imagePreviewUrl ?? null,
+	const [images, setImages] = useState<ItemFormImage[]>(
+		initialValues?.images ?? [],
 	);
-	const [removeImage, setRemoveImage] = useState(false);
 	const [validationError, setValidationError] = useState<string | null>(null);
 	const [showAnalyzeDialog, setShowAnalyzeDialog] = useState(false);
 	const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -107,24 +113,21 @@ export function ItemForm({
 		setStartingBid(String(result.starting_bid_suggestion));
 	};
 
-	const handleCapture = (file: File) => {
-		if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
-		setImageFile(file);
-		setPreviewUrl(URL.createObjectURL(file));
-		setRemoveImage(false);
+	const handleImagesChange = (slots: ImageSlot[]) => {
+		setImages((prev) =>
+			slots.map((slot) => ({
+				url: slot.url,
+				file: slot.file,
+				serverPath: prev.find((img) => img.url === slot.url)?.serverPath,
+			})),
+		);
 		setAnalysisError(null);
 	};
 
-	const handleClearPhoto = () => {
-		if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
-		setImageFile(null);
-		setPreviewUrl(null);
-		setRemoveImage(true);
-		setAnalysisError(null);
-	};
+	const analyzeImageFile = images.find((image) => image.file)?.file;
 
 	const handleAnalyzeClick = () => {
-		if (!imageFile) return;
+		if (!analyzeImageFile) return;
 		setAnalysisError(null);
 		setShowAnalyzeDialog(true);
 	};
@@ -166,8 +169,7 @@ export function ItemForm({
 			actual_sale_price: actualSalePrice
 				? Number.parseFloat(actualSalePrice)
 				: null,
-			imageFile,
-			removeImage,
+			images,
 			aiEvidence: hasAiEvidence(aiEvidence) ? aiEvidence : null,
 		});
 	};
@@ -184,13 +186,13 @@ export function ItemForm({
 				onComplete={handleAnalysisComplete}
 				onError={(message) => setAnalysisError(message)}
 				runAnalysis={async (additionalContext, onStatus) => {
-					if (!imageFile) {
+					if (!analyzeImageFile) {
 						throw new Error("No image selected");
 					}
 					setIsAnalyzing(true);
 					try {
 						return await inventoryApi.analyzeImageStream(
-							imageFile,
+							analyzeImageFile,
 							additionalContext,
 							onStatus,
 						);
@@ -201,14 +203,13 @@ export function ItemForm({
 			/>
 			<form onSubmit={handleSubmit} className="space-y-5">
 				<div className="space-y-2">
-					<p className="text-sm font-medium">Photo</p>
-					<CameraCapture
-						previewUrl={previewUrl}
-						onCapture={handleCapture}
-						onClear={handleClearPhoto}
+					<p className="text-sm font-medium">Photos (up to 4)</p>
+					<MultiImageCapture
+						images={images}
+						onChange={handleImagesChange}
 						disabled={isPending || isAnalyzing}
 					/>
-					{imageFile && (
+					{analyzeImageFile && (
 						<Button
 							type="button"
 							variant="secondary"

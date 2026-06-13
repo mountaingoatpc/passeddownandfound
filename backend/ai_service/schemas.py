@@ -18,15 +18,19 @@ class ItemAnalysisModelOutput(BaseModel):
     """Structured output schema for OpenAI responses.parse(text_format=...)."""
 
     name: str = Field(
-        max_length=60,
+        max_length=40,
         description=(
-            "Short unique inventory label, 3-6 words and under 50 characters. "
-            "Scannable in a list—not a full marketplace title."
+            "Brief inventory phrase, 2-5 words and under 40 characters. "
+            "Not a full marketplace title."
         ),
     )
     category: str = Field(description="Item category such as Collectibles or Glassware.")
     description: str = Field(
-        description="Full marketplace listing description with identification, era, marks, and condition."
+        max_length=500,
+        description=(
+            "Concise item summary in 2-4 short sentences: identification, era or maker, "
+            "materials or marks, and condition. No paragraphs, bullets, or headers."
+        ),
     )
     condition_suggestion: str = Field(
         description="One of: new, pre-owned:excellent, pre-owned:good, pre-owned:fair, pre-owned:damaged."

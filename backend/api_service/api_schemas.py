@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class RegisterRequest(BaseModel):
@@ -36,6 +36,15 @@ class ItemAiEvidence(BaseModel):
     reasoning: str = ""
 
 
+def _validate_image_urls(value: list[str]) -> list[str]:
+    if len(value) > 4:
+        raise ValueError("At most 4 images allowed")
+    cleaned = [url.strip() for url in value if url.strip()]
+    if len(cleaned) != len(value):
+        raise ValueError("Image URLs cannot be empty")
+    return cleaned
+
+
 class CreateInventoryItemRequest(BaseModel):
     name: str = Field(min_length=1)
     category: str = ""
@@ -48,8 +57,13 @@ class CreateInventoryItemRequest(BaseModel):
     cost: float = Field(ge=0)
     projected_sale_price: float = Field(ge=0)
     actual_sale_price: float | None = Field(default=None, ge=0)
-    image_url: str | None = None
+    image_urls: list[str] = Field(default_factory=list, max_length=4)
     ai_evidence: ItemAiEvidence | None = None
+
+    @field_validator("image_urls")
+    @classmethod
+    def validate_image_urls(cls, value: list[str]) -> list[str]:
+        return _validate_image_urls(value)
 
 
 class UpdateInventoryItemRequest(BaseModel):
@@ -64,8 +78,15 @@ class UpdateInventoryItemRequest(BaseModel):
     cost: float | None = Field(default=None, ge=0)
     projected_sale_price: float | None = Field(default=None, ge=0)
     actual_sale_price: float | None = Field(default=None, ge=0)
-    image_url: str | None = None
+    image_urls: list[str] | None = Field(default=None, max_length=4)
     ai_evidence: ItemAiEvidence | None = None
+
+    @field_validator("image_urls")
+    @classmethod
+    def validate_image_urls(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        return _validate_image_urls(value)
 
 
 class InventoryItemResponse(BaseModel):
@@ -81,7 +102,7 @@ class InventoryItemResponse(BaseModel):
     cost: float
     projected_sale_price: float
     actual_sale_price: float | None
-    image_url: str | None
+    image_urls: list[str]
     ai_evidence: ItemAiEvidence | None = None
     owner_uuid: str
     created_at: str

@@ -8,6 +8,7 @@ import {
 } from "@/components/inventory/item-form";
 import { AppHeader, BackLink } from "@/components/layout/app-header";
 import { resolveImageUrl } from "@/config";
+import { resolveItemImageUrls } from "@/lib/upload-item-images";
 
 export const Route = createFileRoute("/_authenticated/inventory/$itemId")({
 	component: EditItemPage,
@@ -30,14 +31,7 @@ function EditItemPage() {
 
 	const updateMutation = useMutation({
 		mutationFn: async (values: ItemFormValues) => {
-			let imageUrl: string | null | undefined;
-
-			if (values.imageFile) {
-				const upload = await inventoryApi.uploadImage(values.imageFile);
-				imageUrl = upload.image_url;
-			} else if (values.removeImage) {
-				imageUrl = null;
-			}
+			const imageUrls = await resolveItemImageUrls(values.images);
 
 			return inventoryApi.update(itemId, {
 				name: values.name,
@@ -52,7 +46,7 @@ function EditItemPage() {
 				projected_sale_price: values.projected_sale_price,
 				actual_sale_price: values.actual_sale_price,
 				ai_evidence: values.aiEvidence,
-				...(imageUrl !== undefined ? { image_url: imageUrl } : {}),
+				image_urls: imageUrls,
 			});
 		},
 		onSuccess: async () => {
@@ -112,7 +106,10 @@ function EditItemPage() {
 						cost: item.cost,
 						projected_sale_price: item.projected_sale_price,
 						actual_sale_price: item.actual_sale_price,
-						imagePreviewUrl: resolveImageUrl(item.image_url),
+						images: item.image_urls.map((path) => ({
+							url: resolveImageUrl(path) ?? path,
+							serverPath: path,
+						})),
 						aiEvidence: item.ai_evidence,
 					}}
 					onSubmit={(values) => {

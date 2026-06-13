@@ -15,7 +15,7 @@ _pool: ConnectionPool | None = None
 
 def _adapt_jsonb_dict(params: dict[str, Any]) -> dict[str, Any]:
     return {
-        key: Json(value) if isinstance(value, dict) else value
+        key: Json(value) if isinstance(value, (dict, list)) else value
         for key, value in params.items()
     }
 

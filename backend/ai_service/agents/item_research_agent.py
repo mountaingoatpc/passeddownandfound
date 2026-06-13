@@ -16,15 +16,15 @@ Given a photo of an item, identify it and research comparable listings and sales
 eBay, Etsy, Whatnot, and other marketplaces.
 
 Your goals:
-1. Suggest a short, unique inventory name (target 3-6 words, under 50 characters).
-   It should be scannable in a table row—specific enough to distinguish this item from
-   similar ones, but not a full marketplace title. Lead with the most recognizable
-   identifier (maker, motif, material, or era). Put full listing-title wording in
-   description instead. Examples: "Greybeard Scotch Stoneware Jug", "Mitchell Bros Whisky Flask".
+1. Suggest a short inventory name: a brief phrase only (2-5 words, under 40 characters).
+   Scannable in a table row—lead with the most recognizable identifier (maker, motif,
+   material, or era). Never write a full marketplace title. Examples: "Greybeard Stoneware Jug",
+   "Mitchell Bros Flask", "Art Deco Table Lamp".
 2. Suggest a category (e.g. Furniture, Jewelry, Glassware, Collectibles).
-3. Write description as a complete marketplace-ready listing body (2-4 short paragraphs):
-   identification, maker, era/date range, materials, marks, condition observations,
-   and relevant provenance or collector notes. Put detailed research here, not in reasoning.
+3. Write a concise description in exactly 2-4 short sentences (not paragraphs):
+   cover identification, era or maker, materials or marks, and visible condition.
+   Be direct and factual—no filler, no bullet lists, no section headers. Put detailed
+   research in comparable_listings notes, not here.
 4. Suggest condition using exactly one of these values:
    - "new" for new/unused items
    - "pre-owned:excellent", "pre-owned:good", "pre-owned:fair",

@@ -45,6 +45,16 @@ def _serialize_ai_evidence(raw: dict | None) -> ItemAiEvidence | None:
     return ItemAiEvidence.model_validate(raw)
 
 
+def _serialize_image_urls(row: dict) -> list[str]:
+    image_urls = row.get("image_urls")
+    if isinstance(image_urls, list) and image_urls:
+        return [str(url) for url in image_urls if url]
+    legacy_url = row.get("image_url")
+    if legacy_url:
+        return [str(legacy_url)]
+    return []
+
+
 def _serialize_item(row: dict) -> InventoryItemResponse:
     return InventoryItemResponse(
         uuid=str(row["uuid"]),
@@ -59,7 +69,7 @@ def _serialize_item(row: dict) -> InventoryItemResponse:
         cost=float(row["cost"]),
         projected_sale_price=float(row["projected_sale_price"]),
         actual_sale_price=float(row["actual_sale_price"]) if row["actual_sale_price"] is not None else None,
-        image_url=row["image_url"],
+        image_urls=_serialize_image_urls(row),
         ai_evidence=_serialize_ai_evidence(row.get("ai_evidence")),
         owner_uuid=str(row["owner_uuid"]),
         created_at=row["created_at"].isoformat(),
@@ -304,7 +314,7 @@ async def create_inventory_item(
         cost=request.cost,
         projected_sale_price=request.projected_sale_price,
         actual_sale_price=request.actual_sale_price,
-        image_url=request.image_url,
+        image_urls=request.image_urls,
         ai_evidence=request.ai_evidence.model_dump() if request.ai_evidence else None,
     )
     if not result:
