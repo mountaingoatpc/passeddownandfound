@@ -26,10 +26,10 @@ class ItemAnalysisModelOutput(BaseModel):
     )
     category: str = Field(description="Item category such as Collectibles or Glassware.")
     description: str = Field(
-        max_length=500,
+        max_length=250,
         description=(
-            "Concise item summary in 2-4 short sentences: identification, era or maker, "
-            "materials or marks, and condition. No paragraphs, bullets, or headers."
+            "Very short item summary in 1-2 sentences: what it is plus one key detail "
+            "(era, maker, materials, or condition). No paragraphs, bullets, or headers."
         ),
     )
     condition_suggestion: str = Field(
