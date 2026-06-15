@@ -7,7 +7,8 @@ interface AnalyzeDialogProps {
 	open: boolean;
 	onClose: () => void;
 	onError: (message: string) => void;
-	onRun: (additionalContext: string) => Promise<void>;
+	onRun?: (additionalContext: string) => Promise<void>;
+	runAnalysis?: (additionalContext: string) => Promise<void>;
 }
 
 export function AnalyzeDialog({
@@ -15,7 +16,9 @@ export function AnalyzeDialog({
 	onClose,
 	onError,
 	onRun,
+	runAnalysis,
 }: AnalyzeDialogProps) {
+	const executeAnalysis = onRun ?? runAnalysis;
 	const [additionalContext, setAdditionalContext] = useState("");
 	const [statusMessage, setStatusMessage] = useState<string | null>(null);
 	const [isRunning, setIsRunning] = useState(false);
@@ -31,11 +34,16 @@ export function AnalyzeDialog({
 	if (!open) return null;
 
 	const handleRun = async () => {
+		if (!executeAnalysis) {
+			onError("Analysis handler is not configured.");
+			return;
+		}
+
 		setIsRunning(true);
 		setStatusMessage("Saving item and starting analysis...");
 
 		try {
-			await onRun(additionalContext);
+			await executeAnalysis(additionalContext);
 			onClose();
 		} catch (err) {
 			onError(err instanceof Error ? err.message : "Failed to start analysis");

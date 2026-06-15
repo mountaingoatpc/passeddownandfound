@@ -134,3 +134,22 @@ class ItemAnalysisResponse(BaseModel):
     comparable_listings: list[ComparableListingResponse] = Field(default_factory=list)
     confidence: float
     reasoning: str
+
+
+class CreateCategoryRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    description: str = Field(default="", max_length=500)
+
+
+class UpdateCategoryRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class CategoryResponse(BaseModel):
+    uuid: str
+    name: str
+    description: str
+    owner_uuid: str
+    created_at: str
+    updated_at: str

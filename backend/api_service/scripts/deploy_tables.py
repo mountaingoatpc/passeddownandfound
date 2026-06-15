@@ -3,13 +3,13 @@ import sys
 
 sys.path.insert(0, ".")
 
-from api_service.tables import InventoryItemTable, UserLoginTable  # noqa: E402
+from api_service.tables import CategoryTable, InventoryItemTable, UserLoginTable  # noqa: E402
 from lib.database.database import Database  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-ALL_TABLES = [UserLoginTable(), InventoryItemTable()]
+ALL_TABLES = [UserLoginTable(), CategoryTable(), InventoryItemTable()]
 
 INVENTORY_ITEM_MIGRATIONS = [
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT ''",

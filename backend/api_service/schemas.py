@@ -6,6 +6,7 @@ class Resource(str, Enum):
     AUTH = "auth"
     USER = "user"
     INVENTORY = "inventory"
+    CATEGORY = "category"
 
 
 class Permission(str, Enum):

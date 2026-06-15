@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 
@@ -34,20 +35,56 @@ def _validate_image(file: UploadFile, content: bytes) -> None:
         raise HTTPException(status_code=400, detail="Unsupported image format")
 
 
+def _parse_categories(categories_json: str | None) -> list[dict[str, str]]:
+    if not categories_json or not categories_json.strip():
+        return []
+
+    try:
+        parsed = json.loads(categories_json)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid categories payload") from exc
+
+    if not isinstance(parsed, list):
+        raise HTTPException(status_code=400, detail="Invalid categories payload")
+
+    categories: list[dict[str, str]] = []
+    for entry in parsed:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name", "")).strip()
+        if not name:
+            continue
+        categories.append(
+            {
+                "name": name,
+                "description": str(entry.get("description", "")).strip(),
+            }
+        )
+
+    return categories
+
+
 @app.post("/analyze-item", response_model=ItemAnalysisResponse)
 async def analyze_item(
     file: UploadFile = File(...),
     additional_context: str | None = Form(default=None),
+    categories_json: str | None = Form(default=None),
 ):
     content = await file.read()
     _validate_image(file, content)
+    categories = _parse_categories(categories_json)
 
     if additional_context and len(additional_context) > MAX_CONTEXT_CHARS:
         raise HTTPException(status_code=400, detail="Additional context must be under 2000 characters")
 
     try:
         agent = ItemResearchAgent()
-        for event in agent.analyze_image_stream(content, file.content_type, additional_context):
+        for event in agent.analyze_image_stream(
+            content,
+            file.content_type,
+            additional_context,
+            categories,
+        ):
             if event["type"] == "result":
                 return ItemAnalysisResponse.model_validate(event["data"])
         raise ValueError("AI analysis returned empty response")
@@ -66,9 +103,11 @@ async def analyze_item(
 async def analyze_item_stream(
     file: UploadFile = File(...),
     additional_context: str | None = Form(default=None),
+    categories_json: str | None = Form(default=None),
 ):
     content = await file.read()
     _validate_image(file, content)
+    categories = _parse_categories(categories_json)
 
     if additional_context and len(additional_context) > MAX_CONTEXT_CHARS:
         raise HTTPException(status_code=400, detail="Additional context must be under 2000 characters")
@@ -76,7 +115,12 @@ async def analyze_item_stream(
     def event_generator():
         try:
             agent = ItemResearchAgent()
-            for event in agent.analyze_image_stream(content, file.content_type, additional_context):
+            for event in agent.analyze_image_stream(
+                content,
+                file.content_type,
+                additional_context,
+                categories,
+            ):
                 if event["type"] == "status":
                     yield encode_sse("status", {"message": event["message"]})
                 elif event["type"] == "result":

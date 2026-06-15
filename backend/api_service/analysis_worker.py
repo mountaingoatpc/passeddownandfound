@@ -5,9 +5,10 @@ from pathlib import Path
 import httpx
 
 from api_service.api_schemas import ItemAiEvidence, ItemAnalysisResponse
+from api_service.category_utils import categories_for_ai, categories_to_json, resolve_ai_category
 from api_service.image_storage import fetch_image_bytes
 from api_service.settings import settings
-from api_service.tables import InventoryItemTable
+from api_service.tables import CategoryTable, InventoryItemTable
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ VALID_CONDITIONS = {
 }
 
 inventory_table = InventoryItemTable()
+category_table = CategoryTable()
 
 
 def _image_urls_from_row(row: dict) -> list[str]:
@@ -72,7 +74,21 @@ def process_analysis_item(row: dict, uploads_path: Path) -> None:
         return
 
     additional_context = row.get("analysis_context")
-    form_data: dict[str, str] = {}
+    category_rows = category_table.get_all_for_owner(owner_uuid)
+    categories = categories_for_ai(category_rows)
+    if not categories:
+        inventory_table.update(
+            item_uuid,
+            owner_uuid,
+            {
+                "analysis_status": "failed",
+                "analysis_error": "Create at least one category before running AI analysis.",
+                "analysis_context": None,
+            },
+        )
+        return
+
+    form_data: dict[str, str] = {"categories_json": categories_to_json(categories)}
     if additional_context and str(additional_context).strip():
         form_data["additional_context"] = str(additional_context).strip()
 
@@ -124,9 +140,10 @@ def process_analysis_item(row: dict, uploads_path: Path) -> None:
         return
 
     analysis = ItemAnalysisResponse.model_validate(response.json())
+    resolved_category = resolve_ai_category(analysis.category, categories)
     updates: dict = {
         "name": analysis.name.strip(),
-        "category": analysis.category.strip(),
+        "category": resolved_category,
         "description": analysis.description.strip(),
         "projected_sale_price": analysis.projected_sale_price,
         "starting_bid": analysis.starting_bid_suggestion,

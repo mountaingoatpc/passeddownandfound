@@ -6,21 +6,14 @@ import { inventoryApi } from "@/api/inventory";
 import { AppHeader } from "@/components/layout/app-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { resolveImageUrl } from "@/config";
 import { isAnalysisInProgress } from "@/lib/analysis-status";
 import { cn } from "@/lib/cn";
-import { resolveImageUrl } from "@/config";
+import { formatCurrency } from "@/lib/format-currency";
 
 export const Route = createFileRoute("/_authenticated/inventory/")({
 	component: InventoryPage,
 });
-
-function formatCurrency(value: number | null | undefined): string {
-	if (value === null || value === undefined) return "—";
-	return new Intl.NumberFormat("en-US", {
-		style: "currency",
-		currency: "USD",
-	}).format(value);
-}
 
 function InventoryPage() {
 	const navigate = useNavigate();
@@ -136,7 +129,9 @@ function InventoryPage() {
 									{items.map((item) => {
 										const imageSrc = resolveImageUrl(item.image_urls[0]);
 										const extraCount = item.image_urls.length - 1;
-										const analyzing = isAnalysisInProgress(item.analysis_status);
+										const analyzing = isAnalysisInProgress(
+											item.analysis_status,
+										);
 										return (
 											<tr
 												key={item.uuid}

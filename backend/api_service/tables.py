@@ -43,6 +43,107 @@ class UserLoginTable(Table):
             return db.insert(self, Record(data={"email": email, "password_hash": password_hash}))
 
 
+class CategoryTable(Table):
+    name: str = "categories"
+    columns: list[Column] = [
+        Column(name="uuid", column_type=ColumnType.UUID, primary_key=True, default="gen_random_uuid()"),
+        Column(name="owner_uuid", column_type=ColumnType.UUID, nullable=False),
+        Column(name="name", column_type=ColumnType.TEXT, nullable=False),
+        Column(name="description", column_type=ColumnType.TEXT, nullable=False, default="''"),
+        Column(name="deleted_at", column_type=ColumnType.TIMESTAMPTZ, nullable=True),
+        Column(name="created_at", column_type=ColumnType.TIMESTAMPTZ, default="now()"),
+        Column(name="updated_at", column_type=ColumnType.TIMESTAMPTZ, default="now()"),
+    ]
+    indexes: list[Index] = [
+        Index(name="idx_categories_owner", columns=["owner_uuid"]),
+    ]
+
+    _ACTIVE_FILTER = "deleted_at IS NULL"
+
+    def get_all_for_owner(self, owner_uuid: str) -> list[dict[str, Any]]:
+        db = Database()
+        with db:
+            return (
+                db.execute(
+                    f"SELECT * FROM {self.fully_qualified_name} "
+                    f"WHERE owner_uuid = %s AND {self._ACTIVE_FILTER} "
+                    f"ORDER BY name ASC",
+                    params=(owner_uuid,),
+                    fetch=True,
+                )
+                or []
+            )
+
+    def get_by_uuid(self, uuid: str, owner_uuid: str) -> dict[str, Any] | None:
+        db = Database()
+        with db:
+            result = db.execute(
+                f"SELECT * FROM {self.fully_qualified_name} "
+                f"WHERE uuid = %s AND owner_uuid = %s AND {self._ACTIVE_FILTER}",
+                params=(uuid, owner_uuid),
+                fetch=True,
+            )
+        return result[0] if result else None
+
+    def get_by_name(self, owner_uuid: str, name: str) -> dict[str, Any] | None:
+        db = Database()
+        with db:
+            result = db.execute(
+                f"SELECT * FROM {self.fully_qualified_name} "
+                f"WHERE owner_uuid = %s AND lower(name) = lower(%s) AND {self._ACTIVE_FILTER}",
+                params=(owner_uuid, name.strip()),
+                fetch=True,
+            )
+        return result[0] if result else None
+
+    def create(self, owner_uuid: str, name: str, description: str = "") -> dict[str, Any] | None:
+        db = Database()
+        with db:
+            return db.insert(
+                self,
+                Record(
+                    data={
+                        "owner_uuid": owner_uuid,
+                        "name": name.strip(),
+                        "description": description.strip(),
+                    }
+                ),
+            )
+
+    def update(self, uuid: str, owner_uuid: str, updates: dict[str, Any]) -> dict[str, Any] | None:
+        if not updates:
+            return self.get_by_uuid(uuid, owner_uuid)
+
+        set_clause = ", ".join(f"{key} = %({key})s" for key in updates)
+        updates["uuid"] = uuid
+        updates["owner_uuid"] = owner_uuid
+        sql = (
+            f"UPDATE {self.fully_qualified_name} SET {set_clause}, updated_at = now() "
+            f"WHERE uuid = %(uuid)s AND owner_uuid = %(owner_uuid)s "
+            f"AND {self._ACTIVE_FILTER} RETURNING *"
+        )
+        db = Database()
+        with db:
+            result = db.execute(sql, params=updates, fetch=True)
+        return result[0] if result else None
+
+    def soft_delete(self, uuid: str, owner_uuid: str) -> dict[str, Any] | None:
+        sql = (
+            f"UPDATE {self.fully_qualified_name} "
+            "SET deleted_at = now(), updated_at = now() "
+            f"WHERE uuid = %(uuid)s AND owner_uuid = %(owner_uuid)s "
+            f"AND {self._ACTIVE_FILTER} RETURNING *"
+        )
+        db = Database()
+        with db:
+            result = db.execute(
+                sql,
+                params={"uuid": uuid, "owner_uuid": owner_uuid},
+                fetch=True,
+            )
+        return result[0] if result else None
+
+
 class InventoryItemTable(Table):
     name: str = "inventory_items"
     columns: list[Column] = [

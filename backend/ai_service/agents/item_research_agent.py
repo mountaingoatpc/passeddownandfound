@@ -20,7 +20,8 @@ Given a photo of an item, identify it and research comparable listings and sales
 eBay, Etsy, Whatnot, and other marketplaces.
 
 Your goals:
-1. Suggest a category (e.g. Furniture, Jewelry, Glassware, Collectibles).
+1. Choose exactly one category from the seller's category list provided in the prompt.
+   Use the exact category name from that list.
 2. Suggest condition using exactly one of these values:
    - "new" for new/unused items
    - "pre-owned:excellent", "pre-owned:good", "pre-owned:fair",
@@ -78,21 +79,44 @@ class ItemResearchAgent:
             timeout=settings.ai_service_request_timeout_seconds,
         )
 
-    def _build_user_prompt(self, additional_context: str | None) -> str:
+    def _build_user_prompt(
+        self,
+        additional_context: str | None,
+        categories: list[dict[str, str]] | None = None,
+    ) -> str:
         prompt = (
             "Analyze this item photo for resale. Search for comparable listings "
             "on eBay, Etsy, and Whatnot. Return structured research and pricing."
         )
+        if categories:
+            category_lines = [
+                f'- "{category["name"]}"'
+                + (f": {category['description']}" if category.get("description") else "")
+                for category in categories
+            ]
+            prompt += (
+                "\n\nChoose exactly one category from this seller-defined list. "
+                "Return the exact category name:\n"
+                + "\n".join(category_lines)
+            )
         if additional_context and additional_context.strip():
             prompt += f"\n\nAdditional context from the seller:\n{additional_context.strip()}"
         return prompt
 
-    def _build_input(self, image_url: str, additional_context: str | None) -> list[dict[str, Any]]:
+    def _build_input(
+        self,
+        image_url: str,
+        additional_context: str | None,
+        categories: list[dict[str, str]] | None = None,
+    ) -> list[dict[str, Any]]:
         return [
             {
                 "role": "user",
                 "content": [
-                    {"type": "input_text", "text": self._build_user_prompt(additional_context)},
+                    {
+                        "type": "input_text",
+                        "text": self._build_user_prompt(additional_context, categories),
+                    },
                     {"type": "input_image", "image_url": image_url},
                 ],
             }
@@ -163,13 +187,14 @@ class ItemResearchAgent:
         self,
         image_url: str,
         additional_context: str | None,
+        categories: list[dict[str, str]] | None = None,
     ) -> Iterator[dict[str, Any]]:
         last_status: str | None = None
 
         with self._client.responses.stream(
             model=settings.ai_service_model,
             instructions=RESEARCH_INSTRUCTIONS,
-            input=self._build_input(image_url, additional_context),
+            input=self._build_input(image_url, additional_context, categories),
             tools=[{"type": "web_search"}],
             text_format=ItemResearchModelOutput,
         ) as stream:
@@ -208,6 +233,7 @@ class ItemResearchAgent:
         image_bytes: bytes,
         content_type: str,
         additional_context: str | None = None,
+        categories: list[dict[str, str]] | None = None,
     ) -> Iterator[dict[str, Any]]:
         media_type = content_type if content_type.startswith("image/") else "image/jpeg"
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
@@ -216,7 +242,7 @@ class ItemResearchAgent:
         yield {"type": "status", "message": "Uploading photo for analysis..."}
 
         research: ItemResearchModelOutput | None = None
-        for event in self._run_research(image_url, additional_context):
+        for event in self._run_research(image_url, additional_context, categories):
             if event["type"] == "research":
                 research = event["data"]
             else:

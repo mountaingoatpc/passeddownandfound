@@ -14,6 +14,8 @@ from lib.database.database import close_pool, warmup_pool
 from api_service.analysis_worker import run_analysis_worker
 from api_service.api_schemas import (
     AuthResponse,
+    CategoryResponse,
+    CreateCategoryRequest,
     CreateInventoryItemRequest,
     InventoryItemResponse,
     ItemAiEvidence,
@@ -21,16 +23,18 @@ from api_service.api_schemas import (
     LoginRequest,
     QueueAnalysisRequest,
     RegisterRequest,
+    UpdateCategoryRequest,
     UpdateInventoryItemRequest,
     UploadResponse,
     UserResponse,
 )
 from api_service.auth import create_token, get_current_user, hash_password, verify_password
+from api_service.category_utils import categories_for_ai, categories_to_json, resolve_ai_category
 from api_service.image_storage import normalize_upload_extension, save_upload
 from api_service.route_metadata import route_metadata
 from api_service.schemas import Permission, Resource
 from api_service.settings import settings
-from api_service.tables import InventoryItemTable, UserLoginTable
+from api_service.tables import CategoryTable, InventoryItemTable, UserLoginTable
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +43,7 @@ UPLOADS_PATH = Path(settings.uploads_dir)
 UPLOADS_PATH.mkdir(parents=True, exist_ok=True)
 
 user_table = UserLoginTable()
+category_table = CategoryTable()
 inventory_table = InventoryItemTable()
 
 
@@ -56,6 +61,17 @@ def _serialize_image_urls(row: dict) -> list[str]:
     if legacy_url:
         return [str(legacy_url)]
     return []
+
+
+def _serialize_category(row: dict) -> CategoryResponse:
+    return CategoryResponse(
+        uuid=str(row["uuid"]),
+        name=row["name"],
+        description=row.get("description") or "",
+        owner_uuid=str(row["owner_uuid"]),
+        created_at=row["created_at"].isoformat(),
+        updated_at=row["updated_at"].isoformat(),
+    )
 
 
 def _serialize_item(row: dict) -> InventoryItemResponse:
@@ -108,6 +124,33 @@ def _queue_item_analysis(
     if not result:
         raise HTTPException(status_code=404, detail="Item not found")
     return result
+
+
+def _owner_categories_for_ai(owner_uuid: str) -> list[dict[str, str]]:
+    rows = category_table.get_all_for_owner(owner_uuid)
+    return categories_for_ai(rows)
+
+
+def _analysis_form_data(
+    additional_context: str | None,
+    categories: list[dict[str, str]],
+) -> dict[str, str]:
+    form_data: dict[str, str] = {}
+    if additional_context and additional_context.strip():
+        form_data["additional_context"] = additional_context.strip()
+    if categories:
+        form_data["categories_json"] = categories_to_json(categories)
+    return form_data
+
+
+def _apply_resolved_category(
+    analysis: ItemAnalysisResponse,
+    categories: list[dict[str, str]],
+) -> ItemAnalysisResponse:
+    resolved = resolve_ai_category(analysis.category, categories)
+    if resolved == analysis.category:
+        return analysis
+    return analysis.model_copy(update={"category": resolved})
 
 
 @asynccontextmanager
@@ -218,9 +261,8 @@ async def analyze_inventory_item(
         raise HTTPException(status_code=400, detail="Image must be under 10MB")
 
     analyze_url = f"{settings.ai_service_url.rstrip('/')}/analyze-item"
-    form_data = {}
-    if additional_context and additional_context.strip():
-        form_data["additional_context"] = additional_context.strip()
+    categories = _owner_categories_for_ai(current_user["uuid"])
+    form_data = _analysis_form_data(additional_context, categories)
 
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
@@ -249,7 +291,8 @@ async def analyze_inventory_item(
             pass
         raise HTTPException(status_code=response.status_code, detail=detail)
 
-    return ItemAnalysisResponse.model_validate(response.json())
+    analysis = ItemAnalysisResponse.model_validate(response.json())
+    return _apply_resolved_category(analysis, categories)
 
 
 @app.post(
@@ -271,9 +314,8 @@ async def analyze_inventory_item_stream(
         raise HTTPException(status_code=400, detail="Image must be under 10MB")
 
     analyze_url = f"{settings.ai_service_url.rstrip('/')}/analyze-item/stream"
-    form_data = {}
-    if additional_context and additional_context.strip():
-        form_data["additional_context"] = additional_context.strip()
+    categories = _owner_categories_for_ai(current_user["uuid"])
+    form_data = _analysis_form_data(additional_context, categories)
 
     async def proxy_stream():
         try:
@@ -343,6 +385,12 @@ async def create_inventory_item(
 ):
     if request.run_analysis and not request.image_urls:
         raise HTTPException(status_code=400, detail="Add at least one photo to analyze with AI")
+
+    if request.run_analysis and not _owner_categories_for_ai(current_user["uuid"]):
+        raise HTTPException(
+            status_code=400,
+            detail="Create at least one category before running AI analysis",
+        )
 
     analysis_status = "queued" if request.run_analysis else "none"
     analysis_context = (
@@ -416,6 +464,11 @@ async def update_inventory_item(
         raise HTTPException(status_code=404, detail="Item not found")
 
     if run_analysis:
+        if not _owner_categories_for_ai(current_user["uuid"]):
+            raise HTTPException(
+                status_code=400,
+                detail="Create at least one category before running AI analysis",
+            )
         result = _queue_item_analysis(item_uuid, current_user["uuid"], analysis_context)
 
     return _serialize_item(result)
@@ -432,6 +485,11 @@ async def queue_inventory_analysis(
     request: QueueAnalysisRequest | None = None,
     current_user: dict = Depends(get_current_user),
 ):
+    if not _owner_categories_for_ai(current_user["uuid"]):
+        raise HTTPException(
+            status_code=400,
+            detail="Create at least one category before running AI analysis",
+        )
     context = request.analysis_context if request else None
     result = _queue_item_analysis(item_uuid, current_user["uuid"], context)
     return _serialize_item(result)
@@ -446,6 +504,76 @@ async def remove_inventory_item(item_uuid: str, current_user: dict = Depends(get
     result = inventory_table.soft_delete(item_uuid, current_user["uuid"])
     if not result:
         raise HTTPException(status_code=404, detail="Item not found")
+
+
+@app.get(
+    "/categories",
+    response_model=list[CategoryResponse],
+    openapi_extra=route_metadata(Resource.CATEGORY, Permission.READ),
+)
+async def list_categories(current_user: dict = Depends(get_current_user)):
+    rows = category_table.get_all_for_owner(current_user["uuid"])
+    return [_serialize_category(row) for row in rows]
+
+
+@app.post(
+    "/categories",
+    response_model=CategoryResponse,
+    openapi_extra=route_metadata(Resource.CATEGORY, Permission.WRITE),
+)
+async def create_category(
+    request: CreateCategoryRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    name = request.name.strip()
+    if category_table.get_by_name(current_user["uuid"], name):
+        raise HTTPException(status_code=400, detail="Category name already exists")
+
+    result = category_table.create(
+        owner_uuid=current_user["uuid"],
+        name=name,
+        description=request.description.strip(),
+    )
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to create category")
+    return _serialize_category(result)
+
+
+@app.put(
+    "/categories/{category_uuid}",
+    response_model=CategoryResponse,
+    openapi_extra=route_metadata(Resource.CATEGORY, Permission.WRITE),
+)
+async def update_category(
+    category_uuid: str,
+    request: UpdateCategoryRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    updates = request.model_dump(exclude_unset=True)
+    if "name" in updates and updates["name"] is not None:
+        name = updates["name"].strip()
+        existing = category_table.get_by_name(current_user["uuid"], name)
+        if existing and str(existing["uuid"]) != category_uuid:
+            raise HTTPException(status_code=400, detail="Category name already exists")
+        updates["name"] = name
+    if "description" in updates and updates["description"] is not None:
+        updates["description"] = updates["description"].strip()
+
+    result = category_table.update(category_uuid, current_user["uuid"], updates)
+    if not result:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return _serialize_category(result)
+
+
+@app.delete(
+    "/categories/{category_uuid}",
+    status_code=204,
+    openapi_extra=route_metadata(Resource.CATEGORY, Permission.WRITE),
+)
+async def remove_category(category_uuid: str, current_user: dict = Depends(get_current_user)):
+    result = category_table.soft_delete(category_uuid, current_user["uuid"])
+    if not result:
+        raise HTTPException(status_code=404, detail="Category not found")
 
 
 if __name__ == "__main__":

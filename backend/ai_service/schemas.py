@@ -17,7 +17,9 @@ class PlatformEstimate(BaseModel):
 class ItemResearchModelOutput(BaseModel):
     """Research and pricing output — name and description are generated separately."""
 
-    category: str = Field(description="Item category such as Collectibles or Glassware.")
+    category: str = Field(
+        description="Exact category name chosen from the seller's provided category list."
+    )
     condition_suggestion: str = Field(
         description="One of: new, pre-owned:excellent, pre-owned:good, pre-owned:fair, pre-owned:damaged."
     )
