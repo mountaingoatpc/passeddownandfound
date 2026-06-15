@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Plus, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Loader2, Plus, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { inventoryApi } from "@/api/inventory";
 import { AppHeader } from "@/components/layout/app-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { isAnalysisInProgress } from "@/lib/analysis-status";
+import { cn } from "@/lib/cn";
 import { resolveImageUrl } from "@/config";
 
 export const Route = createFileRoute("/_authenticated/inventory/")({
@@ -37,7 +39,20 @@ function InventoryPage() {
 	} = useQuery({
 		queryKey: ["inventory", debouncedSearch],
 		queryFn: () => inventoryApi.list(debouncedSearch || undefined),
+		refetchInterval: (query) => {
+			const currentItems = query.state.data ?? [];
+			return currentItems.some((item) =>
+				isAnalysisInProgress(item.analysis_status),
+			)
+				? 3000
+				: false;
+		},
 	});
+
+	const hasAnalysisInProgress = useMemo(
+		() => items.some((item) => isAnalysisInProgress(item.analysis_status)),
+		[items],
+	);
 
 	const goToAddItem = () => navigate({ to: "/inventory/new" });
 
@@ -68,6 +83,12 @@ function InventoryPage() {
 						className="pl-9"
 					/>
 				</div>
+
+				{hasAnalysisInProgress && (
+					<p className="text-sm text-[hsl(var(--muted-foreground))]">
+						AI analysis in progress — this list refreshes automatically.
+					</p>
+				)}
 
 				{isLoading && (
 					<p className="text-center text-sm text-[hsl(var(--muted-foreground))]">
@@ -115,6 +136,7 @@ function InventoryPage() {
 									{items.map((item) => {
 										const imageSrc = resolveImageUrl(item.image_urls[0]);
 										const extraCount = item.image_urls.length - 1;
+										const analyzing = isAnalysisInProgress(item.analysis_status);
 										return (
 											<tr
 												key={item.uuid}
@@ -135,9 +157,17 @@ function InventoryPage() {
 															<img
 																src={imageSrc}
 																alt={item.name}
-																className="h-12 w-12 rounded-md object-cover"
+																className={cn(
+																	"h-12 w-12 rounded-md object-cover",
+																	analyzing && "opacity-60",
+																)}
 															/>
-															{extraCount > 0 && (
+															{analyzing && (
+																<div className="absolute inset-0 flex items-center justify-center rounded-md bg-black/35">
+																	<Loader2 className="h-5 w-5 animate-spin text-white" />
+																</div>
+															)}
+															{extraCount > 0 && !analyzing && (
 																<span className="absolute -bottom-1 -right-1 rounded-full bg-[hsl(var(--foreground))] px-1.5 py-0.5 text-[10px] font-medium leading-none text-[hsl(var(--background))]">
 																	+{extraCount}
 																</span>
@@ -150,7 +180,12 @@ function InventoryPage() {
 													)}
 												</td>
 												<td className="max-w-[12rem] truncate px-3 py-3 font-medium">
-													{item.name}
+													<div className="flex items-center gap-2">
+														{analyzing && (
+															<Loader2 className="h-4 w-4 shrink-0 animate-spin text-[hsl(var(--muted-foreground))]" />
+														)}
+														<span className="truncate">{item.name}</span>
+													</div>
 												</td>
 												<td className="max-w-xs truncate px-3 py-3 text-[hsl(var(--muted-foreground))]">
 													{item.description || "—"}

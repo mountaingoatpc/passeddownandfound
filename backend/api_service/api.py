@@ -1,6 +1,6 @@
+import asyncio
 import json
 import logging
-import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,7 +9,9 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFi
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from lib.database.database import close_pool, warmup_pool
 
+from api_service.analysis_worker import run_analysis_worker
 from api_service.api_schemas import (
     AuthResponse,
     CreateInventoryItemRequest,
@@ -17,17 +19,18 @@ from api_service.api_schemas import (
     ItemAiEvidence,
     ItemAnalysisResponse,
     LoginRequest,
+    QueueAnalysisRequest,
     RegisterRequest,
     UpdateInventoryItemRequest,
     UploadResponse,
     UserResponse,
 )
 from api_service.auth import create_token, get_current_user, hash_password, verify_password
+from api_service.image_storage import normalize_upload_extension, save_upload
 from api_service.route_metadata import route_metadata
 from api_service.schemas import Permission, Resource
 from api_service.settings import settings
 from api_service.tables import InventoryItemTable, UserLoginTable
-from lib.database.database import close_pool, warmup_pool
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -71,17 +74,55 @@ def _serialize_item(row: dict) -> InventoryItemResponse:
         actual_sale_price=float(row["actual_sale_price"]) if row["actual_sale_price"] is not None else None,
         image_urls=_serialize_image_urls(row),
         ai_evidence=_serialize_ai_evidence(row.get("ai_evidence")),
+        analysis_status=row.get("analysis_status") or "none",
+        analysis_error=row.get("analysis_error"),
         owner_uuid=str(row["owner_uuid"]),
         created_at=row["created_at"].isoformat(),
         updated_at=row["updated_at"].isoformat(),
     )
 
 
+def _queue_item_analysis(
+    item_uuid: str,
+    owner_uuid: str,
+    analysis_context: str | None = None,
+) -> dict:
+    row = inventory_table.get_by_uuid(item_uuid, owner_uuid)
+    if not row:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if not _serialize_image_urls(row):
+        raise HTTPException(status_code=400, detail="Item has no photos to analyze")
+    if row.get("analysis_status") in {"queued", "running"}:
+        raise HTTPException(status_code=409, detail="Analysis already in progress")
+
+    context = analysis_context.strip() if analysis_context and analysis_context.strip() else None
+    result = inventory_table.update(
+        item_uuid,
+        owner_uuid,
+        {
+            "analysis_status": "queued",
+            "analysis_error": None,
+            "analysis_context": context,
+        },
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return result
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     warmup_pool()
-    yield
-    close_pool()
+    worker_task = asyncio.create_task(run_analysis_worker(UPLOADS_PATH))
+    try:
+        yield
+    finally:
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
+        close_pool()
 
 
 app = FastAPI(title="atticory API", version="0.1.0", lifespan=lifespan)
@@ -143,19 +184,18 @@ async def upload_image(
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
-    ext = Path(file.filename or "image.jpg").suffix.lower()
-    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic", ".heif"}:
-        ext = ".jpg"
-
-    filename = f"{current_user['uuid']}_{uuid.uuid4().hex}{ext}"
-    dest = UPLOADS_PATH / filename
-
+    ext = normalize_upload_extension(file.filename)
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Image must be under 10MB")
 
-    dest.write_bytes(content)
-    return UploadResponse(image_url=f"/uploads/{filename}")
+    try:
+        image_url = save_upload(UPLOADS_PATH, content, ext)
+    except OSError as exc:
+        logger.exception("Image upload failed")
+        raise HTTPException(status_code=500, detail="Failed to upload image") from exc
+
+    return UploadResponse(image_url=image_url)
 
 
 @app.post(
@@ -301,6 +341,16 @@ async def create_inventory_item(
     request: CreateInventoryItemRequest,
     current_user: dict = Depends(get_current_user),
 ):
+    if request.run_analysis and not request.image_urls:
+        raise HTTPException(status_code=400, detail="Add at least one photo to analyze with AI")
+
+    analysis_status = "queued" if request.run_analysis else "none"
+    analysis_context = (
+        request.analysis_context.strip()
+        if request.run_analysis and request.analysis_context and request.analysis_context.strip()
+        else None
+    )
+
     result = inventory_table.create(
         owner_uuid=current_user["uuid"],
         name=request.name.strip(),
@@ -316,6 +366,8 @@ async def create_inventory_item(
         actual_sale_price=request.actual_sale_price,
         image_urls=request.image_urls,
         ai_evidence=request.ai_evidence.model_dump() if request.ai_evidence else None,
+        analysis_status=analysis_status,
+        analysis_context=analysis_context,
     )
     if not result:
         raise HTTPException(status_code=500, detail="Failed to create item")
@@ -356,10 +408,44 @@ async def update_inventory_item(
     if "ai_evidence" in updates and updates["ai_evidence"] is not None:
         updates["ai_evidence"] = ItemAiEvidence.model_validate(updates["ai_evidence"]).model_dump()
 
+    run_analysis = updates.pop("run_analysis", None)
+    analysis_context = updates.pop("analysis_context", None)
+
     result = inventory_table.update(item_uuid, current_user["uuid"], updates)
     if not result:
         raise HTTPException(status_code=404, detail="Item not found")
+
+    if run_analysis:
+        result = _queue_item_analysis(item_uuid, current_user["uuid"], analysis_context)
+
     return _serialize_item(result)
+
+
+@app.post(
+    "/inventory/{item_uuid}/analyze",
+    response_model=InventoryItemResponse,
+    status_code=202,
+    openapi_extra=route_metadata(Resource.INVENTORY, Permission.WRITE),
+)
+async def queue_inventory_analysis(
+    item_uuid: str,
+    request: QueueAnalysisRequest | None = None,
+    current_user: dict = Depends(get_current_user),
+):
+    context = request.analysis_context if request else None
+    result = _queue_item_analysis(item_uuid, current_user["uuid"], context)
+    return _serialize_item(result)
+
+
+@app.delete(
+    "/inventory/{item_uuid}",
+    status_code=204,
+    openapi_extra=route_metadata(Resource.INVENTORY, Permission.WRITE),
+)
+async def remove_inventory_item(item_uuid: str, current_user: dict = Depends(get_current_user)):
+    result = inventory_table.soft_delete(item_uuid, current_user["uuid"])
+    if not result:
+        raise HTTPException(status_code=404, detail="Item not found")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,13 @@
 import { getConfig } from "@/config";
 import { ApiError, fetchApi, getAuthToken } from "./client";
 
+export type AnalysisStatus =
+	| "none"
+	| "queued"
+	| "running"
+	| "complete"
+	| "failed";
+
 export interface InventoryItem {
 	uuid: string;
 	name: string;
@@ -16,6 +23,8 @@ export interface InventoryItem {
 	actual_sale_price: number | null;
 	image_urls: string[];
 	ai_evidence: ItemAiEvidence | null;
+	analysis_status: AnalysisStatus;
+	analysis_error: string | null;
 	owner_uuid: string;
 	created_at: string;
 	updated_at: string;
@@ -35,6 +44,8 @@ export interface CreateInventoryItemData {
 	actual_sale_price?: number | null;
 	image_urls?: string[];
 	ai_evidence?: ItemAiEvidence | null;
+	run_analysis?: boolean;
+	analysis_context?: string | null;
 }
 
 export type UpdateInventoryItemData = Partial<CreateInventoryItemData>;
@@ -91,6 +102,12 @@ export const inventoryApi = {
 		return fetchApi<InventoryItem>(`/inventory/${uuid}`, {
 			method: "PUT",
 			body: JSON.stringify(data),
+		});
+	},
+
+	async remove(uuid: string): Promise<void> {
+		await fetchApi<void>(`/inventory/${uuid}`, {
+			method: "DELETE",
 		});
 	},
 

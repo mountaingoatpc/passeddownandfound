@@ -1,26 +1,20 @@
 import { Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { ItemAnalysisResponse } from "@/api/inventory";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
 interface AnalyzeDialogProps {
 	open: boolean;
 	onClose: () => void;
-	onComplete: (result: ItemAnalysisResponse) => void;
 	onError: (message: string) => void;
-	runAnalysis: (
-		additionalContext: string,
-		onStatus: (message: string) => void,
-	) => Promise<ItemAnalysisResponse>;
+	onRun: (additionalContext: string) => Promise<void>;
 }
 
 export function AnalyzeDialog({
 	open,
 	onClose,
-	onComplete,
 	onError,
-	runAnalysis,
+	onRun,
 }: AnalyzeDialogProps) {
 	const [additionalContext, setAdditionalContext] = useState("");
 	const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -38,16 +32,13 @@ export function AnalyzeDialog({
 
 	const handleRun = async () => {
 		setIsRunning(true);
-		setStatusMessage("Starting analysis...");
+		setStatusMessage("Saving item and starting analysis...");
 
 		try {
-			const result = await runAnalysis(additionalContext, (message) => {
-				setStatusMessage(message);
-			});
-			onComplete(result);
+			await onRun(additionalContext);
 			onClose();
 		} catch (err) {
-			onError(err instanceof Error ? err.message : "AI analysis failed");
+			onError(err instanceof Error ? err.message : "Failed to start analysis");
 		} finally {
 			setIsRunning(false);
 		}
@@ -73,7 +64,8 @@ export function AnalyzeDialog({
 							Analyze with AI
 						</h2>
 						<p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-							Add anything you already know to improve the results.
+							Your item will be saved automatically. You can return to inventory
+							while analysis runs in the background.
 						</p>
 					</div>
 					<Button
@@ -129,7 +121,7 @@ export function AnalyzeDialog({
 						disabled={isRunning}
 					>
 						<Sparkles className="h-4 w-4" />
-						{isRunning ? "Analyzing..." : "Run analysis"}
+						{isRunning ? "Saving..." : "Run analysis"}
 					</Button>
 				</div>
 			</div>

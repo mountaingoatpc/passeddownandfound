@@ -59,6 +59,8 @@ class CreateInventoryItemRequest(BaseModel):
     actual_sale_price: float | None = Field(default=None, ge=0)
     image_urls: list[str] = Field(default_factory=list, max_length=4)
     ai_evidence: ItemAiEvidence | None = None
+    run_analysis: bool = False
+    analysis_context: str | None = Field(default=None, max_length=2000)
 
     @field_validator("image_urls")
     @classmethod
@@ -80,6 +82,8 @@ class UpdateInventoryItemRequest(BaseModel):
     actual_sale_price: float | None = Field(default=None, ge=0)
     image_urls: list[str] | None = Field(default=None, max_length=4)
     ai_evidence: ItemAiEvidence | None = None
+    run_analysis: bool | None = None
+    analysis_context: str | None = Field(default=None, max_length=2000)
 
     @field_validator("image_urls")
     @classmethod
@@ -104,6 +108,8 @@ class InventoryItemResponse(BaseModel):
     actual_sale_price: float | None
     image_urls: list[str]
     ai_evidence: ItemAiEvidence | None = None
+    analysis_status: str
+    analysis_error: str | None = None
     owner_uuid: str
     created_at: str
     updated_at: str
@@ -111,6 +117,10 @@ class InventoryItemResponse(BaseModel):
 
 class UploadResponse(BaseModel):
     image_url: str
+
+
+class QueueAnalysisRequest(BaseModel):
+    analysis_context: str | None = Field(default=None, max_length=2000)
 
 
 class ItemAnalysisResponse(BaseModel):

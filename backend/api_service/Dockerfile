@@ -11,8 +11,6 @@ COPY lib/ ./lib/
 COPY scripts/ ./scripts/
 COPY . ./api_service/
 
-RUN mkdir -p uploads
-
 ENV PYTHONUNBUFFERED=1
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

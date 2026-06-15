@@ -7,7 +7,9 @@ import {
 	type ItemFormValues,
 } from "@/components/inventory/item-form";
 import { AppHeader, BackLink } from "@/components/layout/app-header";
+import { Button } from "@/components/ui/button";
 import { resolveImageUrl } from "@/config";
+import { isAnalysisInProgress } from "@/lib/analysis-status";
 import { resolveItemImageUrls } from "@/lib/upload-item-images";
 
 export const Route = createFileRoute("/_authenticated/inventory/$itemId")({
@@ -19,6 +21,7 @@ function EditItemPage() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const [error, setError] = useState<string | null>(null);
+	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
 	const {
 		data: item,
@@ -27,9 +30,15 @@ function EditItemPage() {
 	} = useQuery({
 		queryKey: ["inventory", itemId],
 		queryFn: () => inventoryApi.get(itemId),
+		refetchInterval: (query) => {
+			const currentItem = query.state.data;
+			return currentItem && isAnalysisInProgress(currentItem.analysis_status)
+				? 3000
+				: false;
+		},
 	});
 
-	const updateMutation = useMutation({
+	const saveMutation = useMutation({
 		mutationFn: async (values: ItemFormValues) => {
 			const imageUrls = await resolveItemImageUrls(values.images);
 
@@ -57,6 +66,57 @@ function EditItemPage() {
 			setError(err instanceof Error ? err.message : "Failed to update item");
 		},
 	});
+
+	const analyzeMutation = useMutation({
+		mutationFn: async ({
+			values,
+			analysisContext,
+		}: {
+			values: ItemFormValues;
+			analysisContext: string;
+		}) => {
+			const imageUrls = await resolveItemImageUrls(values.images);
+
+			return inventoryApi.update(itemId, {
+				name: values.name,
+				category: values.category,
+				description: values.description,
+				condition: values.condition,
+				quantity: values.quantity,
+				weight_pounds: values.weight_pounds,
+				weight_ounces: values.weight_ounces,
+				starting_bid: values.starting_bid,
+				cost: values.cost,
+				projected_sale_price: values.projected_sale_price,
+				actual_sale_price: values.actual_sale_price,
+				ai_evidence: values.aiEvidence,
+				image_urls: imageUrls,
+				run_analysis: true,
+				analysis_context: analysisContext || null,
+			});
+		},
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({ queryKey: ["inventory"] });
+			await queryClient.invalidateQueries({ queryKey: ["inventory", itemId] });
+		},
+	});
+
+	const deleteMutation = useMutation({
+		mutationFn: () => inventoryApi.remove(itemId),
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({ queryKey: ["inventory"] });
+			navigate({ to: "/inventory" });
+		},
+		onError: (err) => {
+			setError(err instanceof Error ? err.message : "Failed to remove item");
+			setShowDeleteConfirm(false);
+		},
+	});
+
+	const isPending =
+		saveMutation.isPending ||
+		analyzeMutation.isPending ||
+		deleteMutation.isPending;
 
 	if (isLoading) {
 		return (
@@ -93,7 +153,7 @@ function EditItemPage() {
 				<BackLink to="/inventory" label="Back to inventory" />
 
 				<ItemForm
-					key={item.uuid}
+					key={`${item.uuid}-${item.analysis_status}-${item.updated_at}`}
 					initialValues={{
 						name: item.name,
 						category: item.category,
@@ -114,12 +174,63 @@ function EditItemPage() {
 					}}
 					onSubmit={(values) => {
 						setError(null);
-						updateMutation.mutate(values);
+						saveMutation.mutate(values);
 					}}
-					isPending={updateMutation.isPending}
+					onAnalyze={async (values, analysisContext) => {
+						setError(null);
+						await analyzeMutation.mutateAsync({ values, analysisContext });
+					}}
+					isPending={isPending}
 					error={error}
 					submitLabel="Save Changes"
+					analysisStatus={item.analysis_status}
+					analysisError={item.analysis_error}
 				/>
+
+				<div className="rounded-[var(--radius)] border border-[hsl(var(--border))] p-4">
+					{showDeleteConfirm ? (
+						<div className="space-y-3">
+							<p className="text-sm font-medium">Remove from inventory?</p>
+							<p className="text-sm text-[hsl(var(--muted-foreground))]">
+								This item will disappear from your inventory. The record is kept
+								in our system but you will no longer see or edit it here.
+							</p>
+							<div className="flex gap-2">
+								<Button
+									type="button"
+									variant="outline"
+									className="flex-1"
+									onClick={() => setShowDeleteConfirm(false)}
+									disabled={deleteMutation.isPending}
+								>
+									Cancel
+								</Button>
+								<Button
+									type="button"
+									variant="destructive"
+									className="flex-1"
+									onClick={() => deleteMutation.mutate()}
+									disabled={deleteMutation.isPending}
+								>
+									{deleteMutation.isPending ? "Removing..." : "Remove"}
+								</Button>
+							</div>
+						</div>
+					) : (
+						<Button
+							type="button"
+							variant="outline"
+							className="w-full text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive))]/10"
+							onClick={() => {
+								setError(null);
+								setShowDeleteConfirm(true);
+							}}
+							disabled={isPending}
+						>
+							Remove from inventory
+						</Button>
+					)}
+				</div>
 			</main>
 		</div>
 	);
