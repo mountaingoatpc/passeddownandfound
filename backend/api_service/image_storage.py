@@ -48,6 +48,38 @@ class LocalImageStorage(ImageStorage):
         return path.read_bytes(), content_type, filename
 
 
+def s3_configured() -> bool:
+    return bool(
+        settings.s3_bucket_name
+        and settings.aws_access_key_id
+        and settings.aws_secret_access_key
+    )
+
+
+class FallbackImageStorage(ImageStorage):
+    """Try S3 first; on failure write or read from local disk instead."""
+
+    def __init__(self, primary: ImageStorage, fallback: LocalImageStorage) -> None:
+        self._primary = primary
+        self._fallback = fallback
+
+    def upload(self, owner_uuid: str, content: bytes, content_type: str, ext: str) -> str:
+        try:
+            return self._primary.upload(owner_uuid, content, content_type, ext)
+        except Exception as exc:
+            logger.warning("S3 upload failed, falling back to local disk: %s", exc)
+            return self._fallback.upload(owner_uuid, content, content_type, ext)
+
+    def fetch(self, image_url: str) -> tuple[bytes, str, str]:
+        if image_url.startswith("/uploads/"):
+            return self._fallback.fetch(image_url)
+        try:
+            return self._primary.fetch(image_url)
+        except (ClientError, FileNotFoundError, httpx.HTTPError) as exc:
+            logger.warning("S3 fetch failed, trying local disk: %s", exc)
+            return self._fallback.fetch(image_url)
+
+
 class S3ImageStorage(ImageStorage):
     def __init__(self) -> None:
         if not settings.s3_bucket_name:
@@ -154,13 +186,24 @@ def get_image_storage(uploads_dir: Path | None = None) -> ImageStorage:
     if _image_storage is not None:
         return _image_storage
 
-    if settings.s3_bucket_name:
-        logger.info("Using S3 image storage bucket=%s", settings.s3_bucket_name)
-        _image_storage = S3ImageStorage()
+    local_dir = uploads_dir or Path(settings.uploads_dir)
+    local = LocalImageStorage(local_dir)
+
+    if s3_configured():
+        logger.info(
+            "Using S3 image storage bucket=%s (local disk fallback enabled)",
+            settings.s3_bucket_name,
+        )
+        _image_storage = FallbackImageStorage(S3ImageStorage(), local)
     else:
-        local_dir = uploads_dir or Path(settings.uploads_dir)
-        logger.info("Using local image storage dir=%s", local_dir)
-        _image_storage = LocalImageStorage(local_dir)
+        if settings.s3_bucket_name:
+            logger.info(
+                "S3 bucket set but credentials missing; using local image storage dir=%s",
+                local_dir,
+            )
+        else:
+            logger.info("Using local image storage dir=%s", local_dir)
+        _image_storage = local
     return _image_storage
 
 

@@ -121,3 +121,33 @@ tasks:
       - '.env.{{.ENV | default "local"}}'
     cmds:
       - PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}"
+
+  infra:init:
+    desc: Initialize Terraform for AWS image storage
+    dir: infra/aws
+    cmds:
+      - terraform init
+
+  infra:plan:
+    desc: Plan AWS image storage changes
+    dir: infra/aws
+    cmds:
+      - terraform plan
+
+  infra:apply:
+    desc: Apply AWS image storage infrastructure
+    dir: infra/aws
+    cmds:
+      - terraform apply
+
+  infra:destroy:
+    desc: Destroy AWS image storage infrastructure (deletes images)
+    dir: infra/aws
+    cmds:
+      - terraform destroy
+
+  infra:outputs:
+    desc: Print Railway api_service variables from Terraform outputs
+    dir: infra/aws
+    cmds:
+      - bash scripts/print-railway-env.sh

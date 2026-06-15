@@ -1,0 +1,9 @@
+project_name = "atticory"
+environment  = "prod"
+aws_region   = "us-east-1"
+
+# Optional: set a fixed globally-unique bucket name instead of auto-generating one.
+# bucket_name = "atticory-prod-images"
+
+# Must match backend S3_KEY_PREFIX (default: images)
+s3_key_prefix = "images"

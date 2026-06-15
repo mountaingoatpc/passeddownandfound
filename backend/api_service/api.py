@@ -36,8 +36,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 UPLOADS_PATH = Path(settings.uploads_dir)
-if not settings.s3_bucket_name:
-    UPLOADS_PATH.mkdir(parents=True, exist_ok=True)
+UPLOADS_PATH.mkdir(parents=True, exist_ok=True)
 
 image_storage = get_image_storage(UPLOADS_PATH)
 
@@ -139,8 +138,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if not settings.s3_bucket_name:
-    app.mount("/uploads", StaticFiles(directory=str(UPLOADS_PATH)), name="uploads")
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_PATH)), name="uploads")
 
 
 @app.get("/health")
