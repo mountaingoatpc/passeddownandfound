@@ -26,7 +26,7 @@ from api_service.api_schemas import (
     UserResponse,
 )
 from api_service.auth import create_token, get_current_user, hash_password, verify_password
-from api_service.image_storage import get_image_storage, normalize_upload_extension
+from api_service.image_storage import normalize_upload_extension, save_upload
 from api_service.route_metadata import route_metadata
 from api_service.schemas import Permission, Resource
 from api_service.settings import settings
@@ -37,8 +37,6 @@ logging.basicConfig(level=logging.INFO)
 
 UPLOADS_PATH = Path(settings.uploads_dir)
 UPLOADS_PATH.mkdir(parents=True, exist_ok=True)
-
-image_storage = get_image_storage(UPLOADS_PATH)
 
 user_table = UserLoginTable()
 inventory_table = InventoryItemTable()
@@ -191,32 +189,13 @@ async def upload_image(
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Image must be under 10MB")
 
-    content_type = file.content_type or _guess_upload_content_type(ext)
     try:
-        image_url = image_storage.upload(
-            owner_uuid=current_user["uuid"],
-            content=content,
-            content_type=content_type,
-            ext=ext,
-        )
-    except Exception as exc:
+        image_url = save_upload(UPLOADS_PATH, content, ext)
+    except OSError as exc:
         logger.exception("Image upload failed")
         raise HTTPException(status_code=500, detail="Failed to upload image") from exc
 
     return UploadResponse(image_url=image_url)
-
-
-def _guess_upload_content_type(ext: str) -> str:
-    mapping = {
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".png": "image/png",
-        ".webp": "image/webp",
-        ".gif": "image/gif",
-        ".heic": "image/heic",
-        ".heif": "image/heif",
-    }
-    return mapping.get(ext, "image/jpeg")
 
 
 @app.post(

@@ -36,14 +36,6 @@ class Settings(BaseSettings):
     uploads_dir: str = "uploads"
     ai_service_url: str = "http://localhost:8001"
 
-    aws_region: str = "us-east-1"
-    aws_access_key_id: str = ""
-    aws_secret_access_key: str = ""
-    s3_bucket_name: str = ""
-    s3_key_prefix: str = "images"
-    s3_public_base_url: str = ""
-    s3_acl: str = ""
-
     @property
     def database_url(self) -> str:
         env_url = os.environ.get("DATABASE_URL")
