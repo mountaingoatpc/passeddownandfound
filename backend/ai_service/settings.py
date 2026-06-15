@@ -9,7 +9,8 @@ class Settings(BaseSettings):
     ai_service_host: str = "0.0.0.0"
     ai_service_port: int = int(os.environ.get("AI_SERVICE_PORT") or "8001")
     ai_service_openai_api_key: str = ""
-    ai_service_model: str = "gpt-4.1"
+    ai_service_model: str = "gpt-5.5"
+    ai_service_description_model: str = "gpt-5.4-mini"
     ai_service_request_timeout_seconds: int = 90
 
 

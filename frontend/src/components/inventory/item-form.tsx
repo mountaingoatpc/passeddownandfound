@@ -1,10 +1,7 @@
 import { Sparkles } from "lucide-react";
 import { useState } from "react";
-import {
-	type ItemAiEvidence,
-	type ItemAnalysisResponse,
-	inventoryApi,
-} from "@/api/inventory";
+import type { AnalysisStatus, ItemAiEvidence } from "@/api/inventory";
+import { AnalysisProgressBanner } from "@/components/inventory/analysis-progress-banner";
 import { AnalyzeDialog } from "@/components/inventory/analyze-dialog";
 import {
 	MultiImageCapture,
@@ -17,7 +14,8 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { isConditionComplete } from "@/lib/condition";
-import { analysisToEvidence, hasAiEvidence } from "@/lib/item-evidence";
+import { isAnalysisInProgress } from "@/lib/analysis-status";
+import { hasAiEvidence } from "@/lib/item-evidence";
 
 export interface ItemFormImage {
 	url: string;
@@ -47,9 +45,15 @@ interface ItemFormProps {
 		aiEvidence?: ItemAiEvidence | null;
 	};
 	onSubmit: (values: ItemFormValues) => void;
+	onAnalyze: (
+		values: ItemFormValues,
+		analysisContext: string,
+	) => Promise<void>;
 	isPending?: boolean;
 	error?: string | null;
 	submitLabel?: string;
+	analysisStatus?: AnalysisStatus;
+	analysisError?: string | null;
 }
 
 function numberToField(value: number | undefined, fallback = ""): string {
@@ -59,9 +63,12 @@ function numberToField(value: number | undefined, fallback = ""): string {
 export function ItemForm({
 	initialValues,
 	onSubmit,
+	onAnalyze,
 	isPending = false,
 	error = null,
 	submitLabel = "Save Item",
+	analysisStatus = "none",
+	analysisError = null,
 }: ItemFormProps) {
 	const [name, setName] = useState(initialValues?.name ?? "");
 	const [category, setCategory] = useState(initialValues?.category ?? "");
@@ -94,24 +101,15 @@ export function ItemForm({
 		initialValues?.images ?? [],
 	);
 	const [validationError, setValidationError] = useState<string | null>(null);
-	const [showAnalyzeDialog, setShowAnalyzeDialog] = useState(false);
-	const [isAnalyzing, setIsAnalyzing] = useState(false);
-	const [aiEvidence, setAiEvidence] = useState<ItemAiEvidence | null>(
-		initialValues?.aiEvidence ?? null,
+	const [analyzeDialogError, setAnalyzeDialogError] = useState<string | null>(
+		null,
 	);
-	const [evidenceIsFresh, setEvidenceIsFresh] = useState(false);
-	const [analysisError, setAnalysisError] = useState<string | null>(null);
+	const [showAnalyzeDialog, setShowAnalyzeDialog] = useState(false);
+	const aiEvidence = initialValues?.aiEvidence ?? null;
+	const analyzing = isAnalysisInProgress(analysisStatus);
+	const formDisabled = isPending || analyzing;
 
-	const applyAnalysis = (result: ItemAnalysisResponse) => {
-		setName(result.name);
-		setCategory(result.category);
-		setDescription(result.description);
-		if (isConditionComplete(result.condition_suggestion)) {
-			setCondition(result.condition_suggestion);
-		}
-		setProjectedSalePrice(String(result.projected_sale_price));
-		setStartingBid(String(result.starting_bid_suggestion));
-	};
+	const hasPhotos = images.length > 0;
 
 	const handleImagesChange = (slots: ImageSlot[]) => {
 		setImages((prev) =>
@@ -121,57 +119,69 @@ export function ItemForm({
 				serverPath: prev.find((img) => img.url === slot.url)?.serverPath,
 			})),
 		);
-		setAnalysisError(null);
+		setAnalyzeDialogError(null);
 	};
 
-	const analyzeImageFile = images.find((image) => image.file)?.file;
+	const buildFormValues = (options: { allowEmptyName?: boolean } = {}) => ({
+		name: name.trim() || (options.allowEmptyName ? "New item" : ""),
+		category: category.trim(),
+		description: description.trim(),
+		condition,
+		quantity: Number.parseInt(quantity, 10) || 1,
+		weight_pounds: Number.parseInt(weightPounds, 10) || 0,
+		weight_ounces: Number.parseFloat(weightOunces) || 0,
+		starting_bid: Number.parseFloat(startingBid) || 0,
+		cost: Number.parseFloat(cost) || 0,
+		projected_sale_price: Number.parseFloat(projectedSalePrice) || 0,
+		actual_sale_price: actualSalePrice
+			? Number.parseFloat(actualSalePrice)
+			: null,
+		images,
+		aiEvidence: hasAiEvidence(aiEvidence) ? aiEvidence : null,
+	});
 
-	const handleAnalyzeClick = () => {
-		if (!analyzeImageFile) return;
-		setAnalysisError(null);
-		setShowAnalyzeDialog(true);
-	};
+	const validateForm = (options: { requireName?: boolean } = {}) => {
+		if (options.requireName && !name.trim()) {
+			return "Name is required.";
+		}
 
-	const handleAnalysisComplete = (result: ItemAnalysisResponse) => {
-		setAiEvidence(analysisToEvidence(result));
-		setEvidenceIsFresh(true);
-		applyAnalysis(result);
-		setAnalysisError(null);
+		if (condition && !isConditionComplete(condition)) {
+			return "Please select a condition grade for pre-owned items.";
+		}
+
+		return null;
 	};
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
 		setValidationError(null);
 
-		if (!name.trim()) {
-			setValidationError("Name is required.");
+		const errorMessage = validateForm({ requireName: true });
+		if (errorMessage) {
+			setValidationError(errorMessage);
 			return;
 		}
 
-		if (condition && !isConditionComplete(condition)) {
-			setValidationError(
-				"Please select a condition grade for pre-owned items.",
-			);
-			return;
+		onSubmit(buildFormValues());
+	};
+
+	const handleAnalyzeClick = () => {
+		if (!hasPhotos) return;
+		setAnalyzeDialogError(null);
+		setShowAnalyzeDialog(true);
+	};
+
+	const handleAnalyzeRun = async (analysisContext: string) => {
+		if (!hasPhotos) {
+			throw new Error("Add at least one photo to analyze with AI.");
 		}
 
-		onSubmit({
-			name: name.trim(),
-			category: category.trim(),
-			description: description.trim(),
-			condition,
-			quantity: Number.parseInt(quantity, 10) || 1,
-			weight_pounds: Number.parseInt(weightPounds, 10) || 0,
-			weight_ounces: Number.parseFloat(weightOunces) || 0,
-			starting_bid: Number.parseFloat(startingBid) || 0,
-			cost: Number.parseFloat(cost) || 0,
-			projected_sale_price: Number.parseFloat(projectedSalePrice) || 0,
-			actual_sale_price: actualSalePrice
-				? Number.parseFloat(actualSalePrice)
-				: null,
-			images,
-			aiEvidence: hasAiEvidence(aiEvidence) ? aiEvidence : null,
-		});
+		const errorMessage = validateForm({ requireName: false });
+		if (errorMessage) {
+			throw new Error(errorMessage);
+		}
+
+		await onAnalyze(buildFormValues({ allowEmptyName: true }), analysisContext);
 	};
 
 	const displayError = validationError ?? error;
@@ -181,56 +191,46 @@ export function ItemForm({
 			<AnalyzeDialog
 				open={showAnalyzeDialog}
 				onClose={() => {
-					if (!isAnalyzing) setShowAnalyzeDialog(false);
+					if (!isPending) setShowAnalyzeDialog(false);
 				}}
-				onComplete={handleAnalysisComplete}
-				onError={(message) => setAnalysisError(message)}
-				runAnalysis={async (additionalContext, onStatus) => {
-					if (!analyzeImageFile) {
-						throw new Error("No image selected");
-					}
-					setIsAnalyzing(true);
-					try {
-						return await inventoryApi.analyzeImageStream(
-							analyzeImageFile,
-							additionalContext,
-							onStatus,
-						);
-					} finally {
-						setIsAnalyzing(false);
-					}
-				}}
+				onError={(message) => setAnalyzeDialogError(message)}
+				onRun={handleAnalyzeRun}
 			/>
 			<form onSubmit={handleSubmit} className="space-y-5">
+				<AnalysisProgressBanner
+					status={analysisStatus}
+					error={analysisError}
+				/>
+				<fieldset
+					disabled={analyzing}
+					className="space-y-5 border-0 p-0 m-0 min-w-0"
+				>
 				<div className="space-y-2">
 					<p className="text-sm font-medium">Photos (up to 4)</p>
 					<MultiImageCapture
 						images={images}
 						onChange={handleImagesChange}
-						disabled={isPending || isAnalyzing}
+						disabled={formDisabled}
 					/>
-					{analyzeImageFile && (
+					{hasPhotos && (
 						<Button
 							type="button"
 							variant="secondary"
 							className="w-full"
 							onClick={handleAnalyzeClick}
-							disabled={isPending || isAnalyzing}
+							disabled={formDisabled}
 						>
 							<Sparkles className="h-4 w-4" />
 							Analyze with AI
 						</Button>
 					)}
-					{analysisError && (
+					{analyzeDialogError && (
 						<p className="text-sm text-[hsl(var(--destructive))]">
-							{analysisError}
+							{analyzeDialogError}
 						</p>
 					)}
 					{hasAiEvidence(aiEvidence) && (
-						<ItemEvidencePanel
-							evidence={aiEvidence!}
-							title={evidenceIsFresh ? "AI Analysis" : "Market evidence"}
-						/>
+						<ItemEvidencePanel evidence={aiEvidence!} title="Market evidence" />
 					)}
 				</div>
 
@@ -280,7 +280,7 @@ export function ItemForm({
 					<ConditionPicker
 						value={condition}
 						onChange={setCondition}
-						disabled={isPending}
+						disabled={formDisabled}
 					/>
 				</div>
 
@@ -403,10 +403,11 @@ export function ItemForm({
 					type="submit"
 					className="w-full"
 					size="lg"
-					disabled={isPending || isAnalyzing}
+					disabled={formDisabled}
 				>
 					{isPending ? "Saving..." : submitLabel}
 				</Button>
+				</fieldset>
 			</form>
 		</>
 	);

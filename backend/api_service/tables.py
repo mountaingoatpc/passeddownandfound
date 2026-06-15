@@ -62,6 +62,10 @@ class InventoryItemTable(Table):
         Column(name="image_url", column_type=ColumnType.TEXT, nullable=True),
         Column(name="image_urls", column_type=ColumnType.JSONB, nullable=False, default="'[]'"),
         Column(name="ai_evidence", column_type=ColumnType.JSONB, nullable=True),
+        Column(name="analysis_status", column_type=ColumnType.TEXT, nullable=False, default="'none'"),
+        Column(name="analysis_error", column_type=ColumnType.TEXT, nullable=True),
+        Column(name="analysis_context", column_type=ColumnType.TEXT, nullable=True),
+        Column(name="deleted_at", column_type=ColumnType.TIMESTAMPTZ, nullable=True),
         Column(name="created_at", column_type=ColumnType.TIMESTAMPTZ, default="now()"),
         Column(name="updated_at", column_type=ColumnType.TIMESTAMPTZ, default="now()"),
     ]
@@ -75,13 +79,16 @@ class InventoryItemTable(Table):
         ),
     ]
 
+    _ACTIVE_FILTER = "deleted_at IS NULL"
+
     def get_all_for_owner(self, owner_uuid: str, search: str | None = None) -> list[dict[str, Any]]:
         db = Database()
         with db:
             if search and search.strip():
                 query = (
                     f"SELECT * FROM {self.fully_qualified_name} "
-                    f"WHERE owner_uuid = %s AND (name ILIKE %s OR description ILIKE %s) "
+                    f"WHERE owner_uuid = %s AND {self._ACTIVE_FILTER} "
+                    f"AND (name ILIKE %s OR description ILIKE %s) "
                     f"ORDER BY created_at DESC"
                 )
                 pattern = f"%{search.strip()}%"
@@ -90,7 +97,9 @@ class InventoryItemTable(Table):
                 )
             return (
                 db.execute(
-                    f"SELECT * FROM {self.fully_qualified_name} WHERE owner_uuid = %s ORDER BY created_at DESC",
+                    f"SELECT * FROM {self.fully_qualified_name} "
+                    f"WHERE owner_uuid = %s AND {self._ACTIVE_FILTER} "
+                    f"ORDER BY created_at DESC",
                     params=(owner_uuid,),
                     fetch=True,
                 )
@@ -101,7 +110,8 @@ class InventoryItemTable(Table):
         db = Database()
         with db:
             result = db.execute(
-                f"SELECT * FROM {self.fully_qualified_name} WHERE uuid = %s AND owner_uuid = %s",
+                f"SELECT * FROM {self.fully_qualified_name} "
+                f"WHERE uuid = %s AND owner_uuid = %s AND {self._ACTIVE_FILTER}",
                 params=(uuid, owner_uuid),
                 fetch=True,
             )
@@ -123,6 +133,9 @@ class InventoryItemTable(Table):
         weight_ounces: float = 0,
         starting_bid: float = 0,
         ai_evidence: dict[str, Any] | None = None,
+        analysis_status: str = "none",
+        analysis_error: str | None = None,
+        analysis_context: str | None = None,
     ) -> dict[str, Any] | None:
         db = Database()
         with db:
@@ -144,6 +157,9 @@ class InventoryItemTable(Table):
                         "actual_sale_price": actual_sale_price,
                         "image_urls": image_urls or [],
                         "ai_evidence": ai_evidence,
+                        "analysis_status": analysis_status,
+                        "analysis_error": analysis_error,
+                        "analysis_context": analysis_context,
                     }
                 ),
             )
@@ -157,9 +173,44 @@ class InventoryItemTable(Table):
         updates["owner_uuid"] = owner_uuid
         sql = (
             f"UPDATE {self.fully_qualified_name} SET {set_clause}, updated_at = now() "
-            f"WHERE uuid = %(uuid)s AND owner_uuid = %(owner_uuid)s RETURNING *"
+            f"WHERE uuid = %(uuid)s AND owner_uuid = %(owner_uuid)s "
+            f"AND {self._ACTIVE_FILTER} RETURNING *"
         )
         db = Database()
         with db:
             result = db.execute(sql, params=updates, fetch=True)
+        return result[0] if result else None
+
+    def soft_delete(self, uuid: str, owner_uuid: str) -> dict[str, Any] | None:
+        sql = (
+            f"UPDATE {self.fully_qualified_name} "
+            "SET deleted_at = now(), updated_at = now() "
+            f"WHERE uuid = %(uuid)s AND owner_uuid = %(owner_uuid)s "
+            f"AND {self._ACTIVE_FILTER} RETURNING *"
+        )
+        db = Database()
+        with db:
+            result = db.execute(
+                sql,
+                params={"uuid": uuid, "owner_uuid": owner_uuid},
+                fetch=True,
+            )
+        return result[0] if result else None
+
+    def claim_next_queued_analysis(self) -> dict[str, Any] | None:
+        sql = (
+            f"UPDATE {self.fully_qualified_name} "
+            "SET analysis_status = 'running', updated_at = now() "
+            "WHERE uuid = ("
+            f"  SELECT uuid FROM {self.fully_qualified_name} "
+            f"  WHERE analysis_status = 'queued' AND {self._ACTIVE_FILTER} "
+            "  ORDER BY created_at ASC "
+            "  FOR UPDATE SKIP LOCKED "
+            "  LIMIT 1"
+            ") "
+            "RETURNING *"
+        )
+        db = Database()
+        with db:
+            result = db.execute(sql, fetch=True)
         return result[0] if result else None

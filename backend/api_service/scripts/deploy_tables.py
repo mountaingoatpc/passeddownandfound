@@ -21,6 +21,10 @@ INVENTORY_ITEM_MIGRATIONS = [
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS ai_evidence JSONB",
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS image_urls JSONB NOT NULL DEFAULT '[]'",
     "UPDATE public.inventory_items SET image_urls = jsonb_build_array(image_url) WHERE image_url IS NOT NULL AND image_url != ''",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS analysis_status TEXT NOT NULL DEFAULT 'none'",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS analysis_error TEXT",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS analysis_context TEXT",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ",
 ]
 
 
