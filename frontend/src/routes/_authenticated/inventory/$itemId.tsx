@@ -60,6 +60,7 @@ function EditItemPage() {
 		},
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: ["inventory"] });
+			await queryClient.invalidateQueries({ queryKey: ["inventory-metrics"] });
 			navigate({ to: "/inventory" });
 		},
 		onError: (err) => {
@@ -97,6 +98,7 @@ function EditItemPage() {
 		},
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: ["inventory"] });
+			await queryClient.invalidateQueries({ queryKey: ["inventory-metrics"] });
 			await queryClient.invalidateQueries({ queryKey: ["inventory", itemId] });
 		},
 	});
@@ -105,6 +107,7 @@ function EditItemPage() {
 		mutationFn: () => inventoryApi.remove(itemId),
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: ["inventory"] });
+			await queryClient.invalidateQueries({ queryKey: ["inventory-metrics"] });
 			navigate({ to: "/inventory" });
 		},
 		onError: (err) => {

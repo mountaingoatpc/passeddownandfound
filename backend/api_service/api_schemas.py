@@ -93,6 +93,41 @@ class UpdateInventoryItemRequest(BaseModel):
         return _validate_image_urls(value)
 
 
+class InventoryItemSummary(BaseModel):
+    uuid: str
+    name: str
+    description: str
+    cost: float
+    projected_sale_price: float
+    actual_sale_price: float | None
+    image_urls: list[str]
+    analysis_status: str
+    analysis_error: str | None = None
+
+
+class InventoryListResponse(BaseModel):
+    items: list[InventoryItemSummary]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+
+
+class CategoryMetricRow(BaseModel):
+    category: str
+    cost: float
+    projected_sale: float
+    projected_profit: float
+
+
+class InventoryMetricsResponse(BaseModel):
+    total_cost: float
+    total_projected_sale: float
+    projected_profit: float
+    items_sold: int
+    by_category: list[CategoryMetricRow]
+
+
 class InventoryItemResponse(BaseModel):
     uuid: str
     name: str

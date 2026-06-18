@@ -181,6 +181,89 @@ class InventoryItemTable(Table):
     ]
 
     _ACTIVE_FILTER = "deleted_at IS NULL"
+    _LIST_COLUMNS = (
+        "uuid, name, description, cost, projected_sale_price, actual_sale_price, "
+        "image_url, image_urls, analysis_status, analysis_error"
+    )
+    _UNCATEGORIZED_LABEL = "Uncategorized"
+
+    def _search_clause(self, search: str | None) -> tuple[str, tuple[Any, ...]]:
+        if search and search.strip():
+            pattern = f"%{search.strip()}%"
+            return " AND (name ILIKE %s OR description ILIKE %s)", (pattern, pattern)
+        return "", ()
+
+    def count_for_owner(self, owner_uuid: str, search: str | None = None) -> int:
+        search_clause, search_params = self._search_clause(search)
+        db = Database()
+        with db:
+            result = db.execute(
+                f"SELECT COUNT(*) AS count FROM {self.fully_qualified_name} "
+                f"WHERE owner_uuid = %s AND {self._ACTIVE_FILTER}{search_clause}",
+                params=(owner_uuid, *search_params),
+                fetch=True,
+            )
+        return int(result[0]["count"]) if result else 0
+
+    def list_for_owner(
+        self,
+        owner_uuid: str,
+        search: str | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        search_clause, search_params = self._search_clause(search)
+        db = Database()
+        with db:
+            return (
+                db.execute(
+                    f"SELECT {self._LIST_COLUMNS} FROM {self.fully_qualified_name} "
+                    f"WHERE owner_uuid = %s AND {self._ACTIVE_FILTER}{search_clause} "
+                    f"ORDER BY created_at DESC LIMIT %s OFFSET %s",
+                    params=(owner_uuid, *search_params, limit, offset),
+                    fetch=True,
+                )
+                or []
+            )
+
+    def get_metrics_for_owner(self, owner_uuid: str) -> dict[str, Any]:
+        db = Database()
+        with db:
+            totals = db.execute(
+                f"SELECT "
+                f"COALESCE(SUM(cost * quantity), 0) AS total_cost, "
+                f"COALESCE(SUM(projected_sale_price * quantity), 0) AS total_projected_sale, "
+                f"COUNT(*) FILTER (WHERE actual_sale_price IS NOT NULL) AS items_sold "
+                f"FROM {self.fully_qualified_name} "
+                f"WHERE owner_uuid = %s AND {self._ACTIVE_FILTER}",
+                params=(owner_uuid,),
+                fetch=True,
+            )
+            by_category = (
+                db.execute(
+                    f"SELECT "
+                    f"COALESCE(NULLIF(TRIM(category), ''), %s) AS category, "
+                    f"COALESCE(SUM(cost * quantity), 0) AS cost, "
+                    f"COALESCE(SUM(projected_sale_price * quantity), 0) AS projected_sale "
+                    f"FROM {self.fully_qualified_name} "
+                    f"WHERE owner_uuid = %s AND {self._ACTIVE_FILTER} "
+                    f"GROUP BY 1 ORDER BY 1",
+                    params=(self._UNCATEGORIZED_LABEL, owner_uuid),
+                    fetch=True,
+                )
+                or []
+            )
+
+        row = totals[0] if totals else {}
+        total_cost = float(row.get("total_cost", 0))
+        total_projected_sale = float(row.get("total_projected_sale", 0))
+        return {
+            "total_cost": total_cost,
+            "total_projected_sale": total_projected_sale,
+            "projected_profit": total_projected_sale - total_cost,
+            "items_sold": int(row.get("items_sold", 0)),
+            "by_category": by_category,
+        }
 
     def get_all_for_owner(self, owner_uuid: str, search: str | None = None) -> list[dict[str, Any]]:
         db = Database()
