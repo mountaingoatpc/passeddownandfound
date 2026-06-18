@@ -13,8 +13,7 @@ declare global {
 export function getConfig(): AppConfig {
 	const runtimeUrl = window.__RUNTIME_CONFIG__?.apiBaseUrl;
 	return {
-		apiBaseUrl:
-			runtimeUrl || import.meta.env.VITE_API_URL || "/api",
+		apiBaseUrl: runtimeUrl || import.meta.env.VITE_API_URL || "/api",
 	};
 }
 

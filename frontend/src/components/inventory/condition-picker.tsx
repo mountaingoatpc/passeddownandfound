@@ -1,12 +1,12 @@
+import { cn } from "@/lib/cn";
 import {
+	CONDITION_TYPES,
 	type ConditionType,
-	parseCondition,
 	PRE_OWNED_GRADES,
 	type PreOwnedGrade,
+	parseCondition,
 	serializeCondition,
-	CONDITION_TYPES,
 } from "@/lib/condition";
-import { cn } from "@/lib/cn";
 
 interface ConditionPickerProps {
 	value: string;
@@ -65,7 +65,9 @@ export function ConditionPicker({
 				<select
 					id="condition-grade"
 					value={grade}
-					onChange={(e) => handleGradeChange(e.target.value as PreOwnedGrade | "")}
+					onChange={(e) =>
+						handleGradeChange(e.target.value as PreOwnedGrade | "")
+					}
 					disabled={disabled}
 					className={selectClassName}
 				>

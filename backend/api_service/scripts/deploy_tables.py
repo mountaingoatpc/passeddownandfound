@@ -3,8 +3,9 @@ import sys
 
 sys.path.insert(0, ".")
 
-from api_service.tables import CategoryTable, InventoryItemTable, UserLoginTable  # noqa: E402
 from lib.database.database import Database  # noqa: E402
+
+from api_service.tables import CategoryTable, InventoryItemTable, UserLoginTable  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,7 +21,8 @@ INVENTORY_ITEM_MIGRATIONS = [
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS starting_bid REAL NOT NULL DEFAULT 0",
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS ai_evidence JSONB",
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS image_urls JSONB NOT NULL DEFAULT '[]'",
-    "UPDATE public.inventory_items SET image_urls = jsonb_build_array(image_url) WHERE image_url IS NOT NULL AND image_url != ''",
+    "UPDATE public.inventory_items SET image_urls = jsonb_build_array(image_url) "
+    "WHERE image_url IS NOT NULL AND image_url != ''",
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS analysis_status TEXT NOT NULL DEFAULT 'none'",
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS analysis_error TEXT",
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS analysis_context TEXT",

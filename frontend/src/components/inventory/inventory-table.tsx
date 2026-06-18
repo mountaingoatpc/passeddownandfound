@@ -34,14 +34,6 @@ export function InventoryTable({ items, onItemClick }: InventoryTableProps) {
 							<tr
 								key={item.uuid}
 								onClick={() => onItemClick(item.uuid)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === " ") {
-										e.preventDefault();
-										onItemClick(item.uuid);
-									}
-								}}
-								tabIndex={0}
-								role="link"
 								className="cursor-pointer border-b border-[hsl(var(--border))] last:border-0 hover:bg-[hsl(var(--muted))]/30 focus-visible:bg-[hsl(var(--muted))]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[hsl(var(--ring))]"
 							>
 								<td className="px-3 py-3">

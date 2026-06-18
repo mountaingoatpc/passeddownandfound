@@ -276,9 +276,7 @@ class InventoryItemTable(Table):
                     f"ORDER BY created_at DESC"
                 )
                 pattern = f"%{search.strip()}%"
-                return (
-                    db.execute(query, params=(owner_uuid, pattern, pattern), fetch=True) or []
-                )
+                return db.execute(query, params=(owner_uuid, pattern, pattern), fetch=True) or []
             return (
                 db.execute(
                     f"SELECT * FROM {self.fully_qualified_name} "

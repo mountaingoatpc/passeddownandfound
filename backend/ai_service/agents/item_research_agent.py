@@ -90,14 +90,12 @@ class ItemResearchAgent:
         )
         if categories:
             category_lines = [
-                f'- "{category["name"]}"'
-                + (f": {category['description']}" if category.get("description") else "")
+                f'- "{category["name"]}"' + (f": {category['description']}" if category.get("description") else "")
                 for category in categories
             ]
             prompt += (
                 "\n\nChoose exactly one category from this seller-defined list. "
-                "Return the exact category name:\n"
-                + "\n".join(category_lines)
+                "Return the exact category name:\n" + "\n".join(category_lines)
             )
         if additional_context and additional_context.strip():
             prompt += f"\n\nAdditional context from the seller:\n{additional_context.strip()}"
@@ -128,8 +126,7 @@ class ItemResearchAgent:
         additional_context: str | None,
     ) -> str:
         comp_lines = [
-            f"- {listing.platform}: {listing.title}"
-            + (f" (${listing.price})" if listing.price is not None else "")
+            f"- {listing.platform}: {listing.title}" + (f" (${listing.price})" if listing.price is not None else "")
             for listing in research.comparable_listings[:3]
         ]
         comps_summary = "\n".join(comp_lines) if comp_lines else "No comparable listings found."

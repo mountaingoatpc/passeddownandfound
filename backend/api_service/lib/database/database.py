@@ -2,22 +2,18 @@ import logging
 from typing import Any
 
 import psycopg
+from lib.database.schemas import Record, Table
 from psycopg.rows import dict_row
 from psycopg.types.json import Json
 from psycopg_pool import ConnectionPool
 from pydantic import BaseModel
-
-from lib.database.schemas import Record, Table
 
 logger = logging.getLogger(__name__)
 _pool: ConnectionPool | None = None
 
 
 def _adapt_jsonb_dict(params: dict[str, Any]) -> dict[str, Any]:
-    return {
-        key: Json(value) if isinstance(value, (dict, list)) else value
-        for key, value in params.items()
-    }
+    return {key: Json(value) if isinstance(value, (dict, list)) else value for key, value in params.items()}
 
 
 def get_pool() -> ConnectionPool:
@@ -73,9 +69,7 @@ class Database(BaseModel):
             if isinstance(params, dict):
                 params = _adapt_jsonb_dict(params)
             cursor.execute(sql, params)
-            result = (
-                [dict(row) for row in cursor.fetchall()] if fetch else None
-            )
+            result = [dict(row) for row in cursor.fetchall()] if fetch else None
             conn.commit()
             return result
 

@@ -25,24 +25,19 @@ function InventoryPage() {
 	const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
 	useEffect(() => {
-		const timer = setTimeout(() => setDebouncedSearch(search), 300);
+		const timer = setTimeout(() => {
+			setDebouncedSearch(search);
+			setPage(1);
+		}, 300);
 		return () => clearTimeout(timer);
 	}, [search]);
-
-	useEffect(() => {
-		setPage(1);
-	}, [debouncedSearch, pageSize]);
 
 	const listQueryKey = useMemo(
 		() => ["inventory", debouncedSearch, page, pageSize] as const,
 		[debouncedSearch, page, pageSize],
 	);
 
-	const {
-		data,
-		isLoading,
-		error,
-	} = useQuery({
+	const { data, isLoading, error } = useQuery({
 		queryKey: listQueryKey,
 		queryFn: () =>
 			inventoryApi.list({
@@ -136,7 +131,10 @@ function InventoryPage() {
 							total={total}
 							totalPages={totalPages}
 							onPageChange={setPage}
-							onPageSizeChange={setPageSize}
+							onPageSizeChange={(size) => {
+								setPageSize(size);
+								setPage(1);
+							}}
 						/>
 					</div>
 				)}

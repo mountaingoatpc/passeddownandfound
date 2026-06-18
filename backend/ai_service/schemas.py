@@ -17,9 +17,7 @@ class PlatformEstimate(BaseModel):
 class ItemResearchModelOutput(BaseModel):
     """Research and pricing output — name and description are generated separately."""
 
-    category: str = Field(
-        description="Exact category name chosen from the seller's provided category list."
-    )
+    category: str = Field(description="Exact category name chosen from the seller's provided category list.")
     condition_suggestion: str = Field(
         description="One of: new, pre-owned:excellent, pre-owned:good, pre-owned:fair, pre-owned:damaged."
     )
@@ -34,9 +32,7 @@ class ItemResearchModelOutput(BaseModel):
         description="Up to 5 comparable listings or dealer references with URLs from web search.",
     )
     confidence: float = Field(description="Confidence score from 0 to 1.")
-    reasoning: str = Field(
-        description="Brief 1-2 sentence plain-text price summary. No markdown or URLs."
-    )
+    reasoning: str = Field(description="Brief 1-2 sentence plain-text price summary. No markdown or URLs.")
 
 
 class ItemDescriptionModelOutput(BaseModel):
@@ -44,10 +40,7 @@ class ItemDescriptionModelOutput(BaseModel):
 
     name: str = Field(
         max_length=40,
-        description=(
-            "Brief inventory phrase, 2-5 words and under 40 characters. "
-            "Not a full marketplace title."
-        ),
+        description=("Brief inventory phrase, 2-5 words and under 40 characters. Not a full marketplace title."),
     )
     description: str = Field(
         max_length=250,

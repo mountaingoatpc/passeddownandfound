@@ -83,7 +83,7 @@ export function MultiImageCapture({
 						>
 							<img
 								src={slot.url}
-								alt={`Item photo ${index + 1}`}
+								alt={`Item ${index + 1}`}
 								className="h-full w-full object-cover"
 							/>
 							<Button

@@ -270,8 +270,6 @@ async def analyze_inventory_item(
     additional_context: str | None = Form(default=None),
     current_user: dict = Depends(get_current_user),
 ):
-    del current_user
-
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
@@ -323,8 +321,6 @@ async def analyze_inventory_item_stream(
     additional_context: str | None = Form(default=None),
     current_user: dict = Depends(get_current_user),
 ):
-    del current_user
-
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 

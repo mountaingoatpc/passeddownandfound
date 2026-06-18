@@ -260,9 +260,9 @@ export function ItemForm({
 								{analyzeDialogError}
 							</p>
 						)}
-						{hasAiEvidence(aiEvidence) && (
+						{aiEvidence && hasAiEvidence(aiEvidence) && (
 							<ItemEvidencePanel
-								evidence={aiEvidence!}
+								evidence={aiEvidence}
 								title="Market evidence"
 							/>
 						)}

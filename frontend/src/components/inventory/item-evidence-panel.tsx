@@ -9,7 +9,7 @@ interface ItemEvidencePanelProps {
 
 function formatPrice(value: number | null): string {
 	if (value == null) return "—";
-	return "$" + value.toFixed(2);
+	return `$${value.toFixed(2)}`;
 }
 
 export function ItemEvidencePanel({
