@@ -121,3 +121,110 @@ tasks:
       - '.env.{{.ENV | default "local"}}'
     cmds:
       - PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}"
+
+  test:backend:
+    desc: "Run backend tests. Usage: task test:backend [ENV=local]"
+    dir: backend
+    dotenv:
+      - '.env.{{.ENV | default "local"}}'
+    cmds:
+      - uv run pytest tests/ -v
+
+  # ─────────────────────────────────────────────
+  # Release
+  # ─────────────────────────────────────────────
+  release-full:
+    desc: "Full interactive prod release. Usage: task release-full VERSION=v1.0.0"
+    requires:
+      vars: [VERSION]
+    cmds:
+      - task: release:preflight
+      - task: release:lint
+      - task: release:test
+      - task: release:merge
+      - task: release:push
+      - task: release:gh-release
+        vars:
+          VERSION: "{{.VERSION}}"
+      - task: release:finish
+        vars:
+          VERSION: "{{.VERSION}}"
+
+  release:
+    desc: "Create GitHub Release only (release branch already pushed). Usage: task release VERSION=v1.0.0"
+    requires:
+      vars: [VERSION]
+    cmds:
+      - task: release:gh-release
+        vars:
+          VERSION: "{{.VERSION}}"
+
+  release:preflight:
+    desc: Verify release prerequisites
+    internal: true
+    preconditions:
+      - sh: test -z "$(git status --porcelain)"
+        msg: "Working tree must be clean (commit or stash changes first)"
+      - sh: test "$(git branch --show-current)" = "main"
+        msg: "Must be on main branch"
+      - sh: command -v gh >/dev/null 2>&1
+        msg: "GitHub CLI (gh) is required — install from https://cli.github.com"
+    cmds:
+      - git fetch origin
+
+  release:lint:
+    desc: "Release step 1/6 — lint"
+    internal: true
+    prompt: "Run lint (backend ruff + frontend Biome)?"
+    cmds:
+      - task: lint
+
+  release:test:
+    desc: "Release step 2/6 — backend tests"
+    internal: true
+    prompt: "Run backend tests?"
+    cmds:
+      - task: test:backend
+
+  release:merge:
+    desc: "Release step 3/6 — merge main into release"
+    internal: true
+    prompt: "Merge main into release branch?"
+    cmds:
+      - git checkout release
+      - git merge main --no-edit
+
+  release:push:
+    desc: "Release step 4/6 — push release (triggers Railway prod deploy)"
+    internal: true
+    prompt: "Push release branch to origin (triggers Railway prod deploy)?"
+    cmds:
+      - git push origin release
+
+  release:gh-release:
+    desc: "Release step 5/6 — create GitHub Release"
+    internal: true
+    requires:
+      vars: [VERSION]
+    prompt: "Create GitHub Release {{.VERSION}}?"
+    cmds:
+      - gh release create {{.VERSION}} --target release --generate-notes --latest
+
+  release:finish:
+    desc: "Release step 6/6 — return to main"
+    internal: true
+    requires:
+      vars: [VERSION]
+    cmds:
+      - git checkout main
+      - |
+        echo ""
+        echo "════════════════════════════════════════════════════════════"
+        echo "  Release complete."
+        echo ""
+        echo "  If this release included schema changes, run:"
+        echo "    task db:deploy ENV=prod"
+        echo ""
+        echo "  Verify Railway prod deploy and:"
+        echo "    gh release view {{.VERSION}}"
+        echo "════════════════════════════════════════════════════════════"

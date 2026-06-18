@@ -34,6 +34,29 @@ Open [http://localhost:5173](http://localhost:5173). The frontend proxies API re
 
 Set `AI_SERVICE_OPENAI_API_KEY` in `backend/.env.local` to enable **Analyze with AI** on the Add Item page.
 
+## Releases
+
+| Branch | Environment | Trigger |
+|--------|-------------|---------|
+| `main` | Dev | Push → Railway rebuilds dev services |
+| `release` | Prod | Push → Railway rebuilds prod services |
+
+```bash
+# Full interactive release (lint, test, merge, push, GitHub Release)
+task release-full VERSION=v1.0.0
+
+# GitHub Release only (after release branch is already pushed)
+task release VERSION=v1.0.0
+```
+
+After a release with schema changes:
+
+```bash
+task db:deploy ENV=prod
+```
+
+See [guide_to_releases.md](guide_to_releases.md) for the full workflow.
+
 ## Mobile Photo Capture
 
 On mobile browsers, the Add Item page offers **Take Photo** (uses the device camera via `capture="environment"`) and **Gallery** to upload existing images.

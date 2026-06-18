@@ -95,7 +95,7 @@ def process_analysis_item(row: dict, uploads_path: Path) -> None:
     analyze_url = f"{settings.ai_service_url.rstrip('/')}/analyze-item"
 
     try:
-        with httpx.Client(timeout=120.0) as client:
+        with httpx.Client(timeout=300.0) as client:
             response = client.post(
                 analyze_url,
                 files={

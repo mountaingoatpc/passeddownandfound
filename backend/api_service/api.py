@@ -265,7 +265,7 @@ async def analyze_inventory_item(
     form_data = _analysis_form_data(additional_context, categories)
 
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.post(
                 analyze_url,
                 files={
@@ -319,7 +319,7 @@ async def analyze_inventory_item_stream(
 
     async def proxy_stream():
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=300.0) as client:
                 async with client.stream(
                     "POST",
                     analyze_url,
