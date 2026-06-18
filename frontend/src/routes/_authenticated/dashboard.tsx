@@ -9,8 +9,7 @@ import { formatCurrency } from "@/lib/format-currency";
 import {
 	CATEGORY_CHART_METRIC_OPTIONS,
 	type CategoryChartMetric,
-	computeCategoryMetrics,
-	computeInventoryMetrics,
+	type CategoryMetricRow,
 } from "@/lib/inventory-metrics";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -53,16 +52,24 @@ function DashboardPage() {
 		useState<CategoryChartMetric>("projected_sale");
 
 	const {
-		data: items = [],
+		data: metrics,
 		isLoading,
 		error,
 	} = useQuery({
-		queryKey: ["inventory"],
-		queryFn: () => inventoryApi.list(),
+		queryKey: ["inventory-metrics"],
+		queryFn: () => inventoryApi.metrics(),
 	});
 
-	const metrics = computeInventoryMetrics(items);
-	const categoryMetrics = useMemo(() => computeCategoryMetrics(items), [items]);
+	const categoryMetrics = useMemo<CategoryMetricRow[]>(
+		() =>
+			metrics?.by_category.map((row) => ({
+				category: row.category,
+				cost: row.cost,
+				projectedSale: row.projected_sale,
+				projectedProfit: row.projected_profit,
+			})) ?? [],
+		[metrics],
+	);
 
 	return (
 		<div className="min-h-dvh">
@@ -90,32 +97,32 @@ function DashboardPage() {
 					</p>
 				)}
 
-				{!isLoading && !error && (
+				{!isLoading && !error && metrics && (
 					<>
 						<div className="grid gap-4 sm:grid-cols-2">
 							<MetricCard
 								label="Total Cost"
-								value={formatCurrency(metrics.totalCost)}
+								value={formatCurrency(metrics.total_cost)}
 								description="Sum of item costs × quantity"
 							/>
 							<MetricCard
 								label="Total Projected Sale"
-								value={formatCurrency(metrics.totalProjectedSale)}
+								value={formatCurrency(metrics.total_projected_sale)}
 								description="Sum of projected sale prices × quantity"
 							/>
 							<MetricCard
 								label="Projected Profit"
-								value={formatCurrency(metrics.projectedProfit)}
+								value={formatCurrency(metrics.projected_profit)}
 								description="Projected sale minus total cost"
 								valueClassName={
-									metrics.projectedProfit >= 0
+									metrics.projected_profit >= 0
 										? "text-[hsl(var(--success))]"
 										: "text-[hsl(var(--destructive))]"
 								}
 							/>
 							<MetricCard
 								label="Items Sold"
-								value={String(metrics.itemsSold)}
+								value={String(metrics.items_sold)}
 								description="Inventory items with an actual sale price recorded"
 							/>
 						</div>

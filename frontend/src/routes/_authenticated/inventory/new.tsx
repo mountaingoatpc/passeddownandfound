@@ -65,6 +65,7 @@ function AddItemPage() {
 		},
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: ["inventory"] });
+			await queryClient.invalidateQueries({ queryKey: ["inventory-metrics"] });
 			navigate({ to: "/inventory" });
 		},
 		onError: (err) => {
@@ -82,6 +83,7 @@ function AddItemPage() {
 		}) => saveItemWithAnalysis(values, analysisContext),
 		onSuccess: async (item) => {
 			await queryClient.invalidateQueries({ queryKey: ["inventory"] });
+			await queryClient.invalidateQueries({ queryKey: ["inventory-metrics"] });
 			navigate({
 				to: "/inventory/$itemId",
 				params: { itemId: item.uuid },

@@ -30,6 +30,47 @@ export interface InventoryItem {
 	updated_at: string;
 }
 
+export interface InventoryItemSummary {
+	uuid: string;
+	name: string;
+	description: string;
+	cost: number;
+	projected_sale_price: number;
+	actual_sale_price: number | null;
+	image_urls: string[];
+	analysis_status: AnalysisStatus;
+	analysis_error: string | null;
+}
+
+export interface InventoryListResponse {
+	items: InventoryItemSummary[];
+	total: number;
+	page: number;
+	limit: number;
+	total_pages: number;
+}
+
+export interface InventoryMetricsCategoryRow {
+	category: string;
+	cost: number;
+	projected_sale: number;
+	projected_profit: number;
+}
+
+export interface InventoryMetricsResponse {
+	total_cost: number;
+	total_projected_sale: number;
+	projected_profit: number;
+	items_sold: number;
+	by_category: InventoryMetricsCategoryRow[];
+}
+
+export interface InventoryListParams {
+	search?: string;
+	page?: number;
+	limit?: number;
+}
+
 export interface CreateInventoryItemData {
 	name: string;
 	category: string;
@@ -79,9 +120,25 @@ export interface ItemAnalysisResponse {
 }
 
 export const inventoryApi = {
-	async list(search?: string): Promise<InventoryItem[]> {
-		const params = search ? `?search=${encodeURIComponent(search)}` : "";
-		return fetchApi<InventoryItem[]>(`/inventory${params}`);
+	async list(params: InventoryListParams = {}): Promise<InventoryListResponse> {
+		const searchParams = new URLSearchParams();
+		if (params.search) {
+			searchParams.set("search", params.search);
+		}
+		if (params.page != null) {
+			searchParams.set("page", String(params.page));
+		}
+		if (params.limit != null) {
+			searchParams.set("limit", String(params.limit));
+		}
+		const query = searchParams.toString();
+		return fetchApi<InventoryListResponse>(
+			`/inventory${query ? `?${query}` : ""}`,
+		);
+	},
+
+	async metrics(): Promise<InventoryMetricsResponse> {
+		return fetchApi<InventoryMetricsResponse>("/inventory/metrics");
 	},
 
 	async get(uuid: string): Promise<InventoryItem> {

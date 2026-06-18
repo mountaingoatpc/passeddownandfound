@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import math
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -14,10 +15,14 @@ from lib.database.database import close_pool, warmup_pool
 from api_service.analysis_worker import run_analysis_worker
 from api_service.api_schemas import (
     AuthResponse,
+    CategoryMetricRow,
     CategoryResponse,
     CreateCategoryRequest,
     CreateInventoryItemRequest,
     InventoryItemResponse,
+    InventoryItemSummary,
+    InventoryListResponse,
+    InventoryMetricsResponse,
     ItemAiEvidence,
     ItemAnalysisResponse,
     LoginRequest,
@@ -95,6 +100,20 @@ def _serialize_item(row: dict) -> InventoryItemResponse:
         owner_uuid=str(row["owner_uuid"]),
         created_at=row["created_at"].isoformat(),
         updated_at=row["updated_at"].isoformat(),
+    )
+
+
+def _serialize_item_summary(row: dict) -> InventoryItemSummary:
+    return InventoryItemSummary(
+        uuid=str(row["uuid"]),
+        name=row["name"],
+        description=row["description"] or "",
+        cost=float(row["cost"]),
+        projected_sale_price=float(row["projected_sale_price"]),
+        actual_sale_price=float(row["actual_sale_price"]) if row["actual_sale_price"] is not None else None,
+        image_urls=_serialize_image_urls(row),
+        analysis_status=row.get("analysis_status") or "none",
+        analysis_error=row.get("analysis_error"),
     )
 
 
@@ -363,15 +382,67 @@ async def analyze_inventory_item_stream(
 
 @app.get(
     "/inventory",
-    response_model=list[InventoryItemResponse],
+    response_model=InventoryListResponse,
     openapi_extra=route_metadata(Resource.INVENTORY, Permission.READ),
 )
 async def list_inventory(
     search: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=25, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
 ):
-    rows = inventory_table.get_all_for_owner(current_user["uuid"], search=search)
-    return [_serialize_item(row) for row in rows]
+    owner_uuid = current_user["uuid"]
+    total = inventory_table.count_for_owner(owner_uuid, search=search)
+    if total == 0:
+        return InventoryListResponse(
+            items=[],
+            total=0,
+            page=1,
+            limit=limit,
+            total_pages=0,
+        )
+
+    total_pages = math.ceil(total / limit)
+    page = min(page, total_pages)
+    offset = (page - 1) * limit
+    rows = inventory_table.list_for_owner(
+        owner_uuid,
+        search=search,
+        limit=limit,
+        offset=offset,
+    )
+    return InventoryListResponse(
+        items=[_serialize_item_summary(row) for row in rows],
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=total_pages,
+    )
+
+
+@app.get(
+    "/inventory/metrics",
+    response_model=InventoryMetricsResponse,
+    openapi_extra=route_metadata(Resource.INVENTORY, Permission.READ),
+)
+async def get_inventory_metrics(current_user: dict = Depends(get_current_user)):
+    metrics = inventory_table.get_metrics_for_owner(current_user["uuid"])
+    by_category = [
+        CategoryMetricRow(
+            category=row["category"],
+            cost=float(row["cost"]),
+            projected_sale=float(row["projected_sale"]),
+            projected_profit=float(row["projected_sale"]) - float(row["cost"]),
+        )
+        for row in metrics["by_category"]
+    ]
+    return InventoryMetricsResponse(
+        total_cost=metrics["total_cost"],
+        total_projected_sale=metrics["total_projected_sale"],
+        projected_profit=metrics["projected_profit"],
+        items_sold=metrics["items_sold"],
+        by_category=by_category,
+    )
 
 
 @app.post(
