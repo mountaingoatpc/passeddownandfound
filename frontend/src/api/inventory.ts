@@ -58,6 +58,7 @@ export interface InventoryMetricsCategoryRow {
 }
 
 export interface InventoryMetricsResponse {
+	total_items: number;
 	total_cost: number;
 	total_projected_sale: number;
 	projected_profit: number;

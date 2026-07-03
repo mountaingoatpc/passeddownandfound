@@ -101,6 +101,11 @@ function DashboardPage() {
 					<>
 						<div className="grid gap-4 sm:grid-cols-2">
 							<MetricCard
+								label="Total Items"
+								value={String(metrics.total_items)}
+								description="Active inventory items in your collection"
+							/>
+							<MetricCard
 								label="Total Cost"
 								value={formatCurrency(metrics.total_cost)}
 								description="Sum of item costs × quantity"

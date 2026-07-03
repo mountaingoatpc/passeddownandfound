@@ -433,6 +433,7 @@ async def get_inventory_metrics(current_user: dict = Depends(get_current_user)):
         for row in metrics["by_category"]
     ]
     return InventoryMetricsResponse(
+        total_items=metrics["total_items"],
         total_cost=metrics["total_cost"],
         total_projected_sale=metrics["total_projected_sale"],
         projected_profit=metrics["projected_profit"],
