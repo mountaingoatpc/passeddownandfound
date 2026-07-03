@@ -231,6 +231,7 @@ class InventoryItemTable(Table):
         with db:
             totals = db.execute(
                 f"SELECT "
+                f"COUNT(*) AS total_items, "
                 f"COALESCE(SUM(cost * quantity), 0) AS total_cost, "
                 f"COALESCE(SUM(projected_sale_price * quantity), 0) AS total_projected_sale, "
                 f"COUNT(*) FILTER (WHERE actual_sale_price IS NOT NULL) AS items_sold "
@@ -258,6 +259,7 @@ class InventoryItemTable(Table):
         total_cost = float(row.get("total_cost", 0))
         total_projected_sale = float(row.get("total_projected_sale", 0))
         return {
+            "total_items": int(row.get("total_items", 0)),
             "total_cost": total_cost,
             "total_projected_sale": total_projected_sale,
             "projected_profit": total_projected_sale - total_cost,

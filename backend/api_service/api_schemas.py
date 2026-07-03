@@ -121,6 +121,7 @@ class CategoryMetricRow(BaseModel):
 
 
 class InventoryMetricsResponse(BaseModel):
+    total_items: int
     total_cost: float
     total_projected_sale: float
     projected_profit: float

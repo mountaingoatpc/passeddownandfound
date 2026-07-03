@@ -1,6 +1,7 @@
 import type { InventoryItem } from "@/api/inventory";
 
 export interface InventoryMetrics {
+	totalItems: number;
 	totalCost: number;
 	totalProjectedSale: number;
 	projectedProfit: number;
@@ -38,6 +39,7 @@ export function computeInventoryMetrics(
 	}
 
 	return {
+		totalItems: items.length,
 		totalCost,
 		totalProjectedSale,
 		projectedProfit: totalProjectedSale - totalCost,
