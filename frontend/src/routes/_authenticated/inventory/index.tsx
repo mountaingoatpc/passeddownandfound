@@ -60,9 +60,6 @@ function InventoryPage() {
 
 	const goToAddItem = () => navigate({ to: "/inventory/new" });
 
-	const goToEditItem = (itemId: string) =>
-		navigate({ to: "/inventory/$itemId", params: { itemId } });
-
 	return (
 		<div className="min-h-dvh">
 			<AppHeader
@@ -124,7 +121,7 @@ function InventoryPage() {
 
 				{items.length > 0 && (
 					<div className="overflow-hidden rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-sm">
-						<InventoryTable items={items} onItemClick={goToEditItem} />
+						<InventoryTable items={items} />
 						<InventoryPagination
 							page={page}
 							pageSize={pageSize}

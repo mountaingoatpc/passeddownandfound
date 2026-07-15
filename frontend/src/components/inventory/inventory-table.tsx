@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import type { InventoryItemSummary } from "@/api/inventory";
 import { resolveImageUrl } from "@/config";
@@ -7,10 +8,9 @@ import { formatCurrency } from "@/lib/format-currency";
 
 interface InventoryTableProps {
 	items: InventoryItemSummary[];
-	onItemClick: (itemId: string) => void;
 }
 
-export function InventoryTable({ items, onItemClick }: InventoryTableProps) {
+export function InventoryTable({ items }: InventoryTableProps) {
 	return (
 		<div className="overflow-x-auto">
 			<table className="w-full min-w-[720px] text-left text-sm">
@@ -33,15 +33,20 @@ export function InventoryTable({ items, onItemClick }: InventoryTableProps) {
 						return (
 							<tr
 								key={item.uuid}
-								onClick={() => onItemClick(item.uuid)}
-								className="cursor-pointer border-b border-[hsl(var(--border))] last:border-0 hover:bg-[hsl(var(--muted))]/30 focus-visible:bg-[hsl(var(--muted))]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[hsl(var(--ring))]"
+								className="relative border-b border-[hsl(var(--border))] last:border-0 hover:bg-[hsl(var(--muted))]/30 has-[:focus-visible]:bg-[hsl(var(--muted))]/30 has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset has-[:focus-visible]:ring-[hsl(var(--ring))]"
 							>
 								<td className="px-3 py-3">
+									<Link
+										to="/inventory/$itemId"
+										params={{ itemId: item.uuid }}
+										aria-label={`Open ${item.name}`}
+										className="absolute inset-0 z-10 cursor-pointer"
+									/>
 									{imageSrc ? (
 										<div className="relative h-12 w-12">
 											<img
 												src={imageSrc}
-												alt={item.name}
+												alt=""
 												loading="lazy"
 												className={cn(
 													"h-12 w-12 rounded-md object-cover",

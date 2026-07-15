@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { isAnalysisInProgress } from "@/lib/analysis-status";
 import { isConditionComplete } from "@/lib/condition";
+import { formatCurrencyInputValue } from "@/lib/format-currency";
 import { hasAiEvidence } from "@/lib/item-evidence";
 
 export interface ItemFormImage {
@@ -89,16 +90,16 @@ export function ItemForm({
 		numberToField(initialValues?.weight_ounces, "0"),
 	);
 	const [startingBid, setStartingBid] = useState(
-		numberToField(initialValues?.starting_bid),
+		formatCurrencyInputValue(initialValues?.starting_bid),
 	);
-	const [cost, setCost] = useState(numberToField(initialValues?.cost));
+	const [cost, setCost] = useState(
+		formatCurrencyInputValue(initialValues?.cost),
+	);
 	const [projectedSalePrice, setProjectedSalePrice] = useState(
-		numberToField(initialValues?.projected_sale_price),
+		formatCurrencyInputValue(initialValues?.projected_sale_price),
 	);
 	const [actualSalePrice, setActualSalePrice] = useState(
-		initialValues?.actual_sale_price != null
-			? String(initialValues.actual_sale_price)
-			: "",
+		formatCurrencyInputValue(initialValues?.actual_sale_price),
 	);
 	const [images, setImages] = useState<ItemFormImage[]>(
 		initialValues?.images ?? [],
