@@ -88,7 +88,8 @@ export function computeCategoryMetrics(
 		byCategory.set(category, {
 			cost: existing.cost + cost,
 			projectedSale: existing.projectedSale + projectedSale,
-			profit: existing.profit + (itemProfit != null ? itemProfit * quantity : 0),
+			profit:
+				existing.profit + (itemProfit != null ? itemProfit * quantity : 0),
 		});
 	}
 

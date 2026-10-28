@@ -86,7 +86,7 @@ export function InventoryPagination({
 						<ChevronLeft className="h-4 w-4" />
 						Previous
 					</Button>
-					<label className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
+					<div className="flex items-center gap-2 text-sm text-[hsl(var(--muted-foreground))]">
 						<span>Page</span>
 						{totalPages <= PAGE_SELECT_THRESHOLD ? (
 							<select
@@ -123,7 +123,7 @@ export function InventoryPagination({
 							/>
 						)}
 						<span>of {totalPages}</span>
-					</label>
+					</div>
 					<Button
 						type="button"
 						variant="outline"
