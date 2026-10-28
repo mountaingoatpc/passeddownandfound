@@ -234,7 +234,9 @@ class InventoryItemTable(Table):
                 f"COUNT(*) AS total_items, "
                 f"COALESCE(SUM(cost * quantity), 0) AS total_cost, "
                 f"COALESCE(SUM(projected_sale_price * quantity), 0) AS total_projected_sale, "
-                f"COUNT(*) FILTER (WHERE actual_sale_price IS NOT NULL) AS items_sold "
+                f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
+                f"THEN (actual_sale_price - cost) * quantity ELSE 0 END), 0) AS profit, "
+                f"COUNT(*) FILTER (WHERE actual_sale_price > 0) AS items_sold "
                 f"FROM {self.fully_qualified_name} "
                 f"WHERE owner_uuid = %s AND {self._ACTIVE_FILTER}",
                 params=(owner_uuid,),
@@ -245,7 +247,9 @@ class InventoryItemTable(Table):
                     f"SELECT "
                     f"COALESCE(NULLIF(TRIM(category), ''), %s) AS category, "
                     f"COALESCE(SUM(cost * quantity), 0) AS cost, "
-                    f"COALESCE(SUM(projected_sale_price * quantity), 0) AS projected_sale "
+                    f"COALESCE(SUM(projected_sale_price * quantity), 0) AS projected_sale, "
+                    f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
+                    f"THEN (actual_sale_price - cost) * quantity ELSE 0 END), 0) AS profit "
                     f"FROM {self.fully_qualified_name} "
                     f"WHERE owner_uuid = %s AND {self._ACTIVE_FILTER} "
                     f"GROUP BY 1 ORDER BY 1",
@@ -263,6 +267,7 @@ class InventoryItemTable(Table):
             "total_cost": total_cost,
             "total_projected_sale": total_projected_sale,
             "projected_profit": total_projected_sale - total_cost,
+            "profit": float(row.get("profit", 0)),
             "items_sold": int(row.get("items_sold", 0)),
             "by_category": by_category,
         }
