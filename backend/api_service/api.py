@@ -429,6 +429,7 @@ async def get_inventory_metrics(current_user: dict = Depends(get_current_user)):
             cost=float(row["cost"]),
             projected_sale=float(row["projected_sale"]),
             projected_profit=float(row["projected_sale"]) - float(row["cost"]),
+            profit=float(row["profit"]),
         )
         for row in metrics["by_category"]
     ]
@@ -437,6 +438,7 @@ async def get_inventory_metrics(current_user: dict = Depends(get_current_user)):
         total_cost=metrics["total_cost"],
         total_projected_sale=metrics["total_projected_sale"],
         projected_profit=metrics["projected_profit"],
+        profit=metrics["profit"],
         items_sold=metrics["items_sold"],
         by_category=by_category,
     )

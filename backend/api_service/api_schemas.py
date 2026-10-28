@@ -118,6 +118,7 @@ class CategoryMetricRow(BaseModel):
     cost: float
     projected_sale: float
     projected_profit: float
+    profit: float
 
 
 class InventoryMetricsResponse(BaseModel):
@@ -125,6 +126,7 @@ class InventoryMetricsResponse(BaseModel):
     total_cost: float
     total_projected_sale: float
     projected_profit: float
+    profit: float
     items_sold: int
     by_category: list[CategoryMetricRow]
 

@@ -5,6 +5,7 @@ import { resolveImageUrl } from "@/config";
 import { isAnalysisInProgress } from "@/lib/analysis-status";
 import { cn } from "@/lib/cn";
 import { formatCurrency } from "@/lib/format-currency";
+import { getItemProfit } from "@/lib/inventory-metrics";
 
 interface InventoryTableProps {
 	items: InventoryItemSummary[];
@@ -13,7 +14,7 @@ interface InventoryTableProps {
 export function InventoryTable({ items }: InventoryTableProps) {
 	return (
 		<div className="overflow-x-auto">
-			<table className="w-full min-w-[720px] text-left text-sm">
+			<table className="w-full min-w-[800px] text-left text-sm">
 				<thead className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/60">
 					<tr>
 						<th className="px-3 py-3 font-medium">Photo</th>
@@ -22,6 +23,7 @@ export function InventoryTable({ items }: InventoryTableProps) {
 						<th className="px-3 py-3 font-medium">Cost</th>
 						<th className="px-3 py-3 font-medium">Projected Sale</th>
 						<th className="px-3 py-3 font-medium">Actual Sale</th>
+						<th className="px-3 py-3 font-medium">Profit</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -29,6 +31,7 @@ export function InventoryTable({ items }: InventoryTableProps) {
 						const imageSrc = resolveImageUrl(item.image_urls[0]);
 						const extraCount = item.image_urls.length - 1;
 						const analyzing = isAnalysisInProgress(item.analysis_status);
+						const profit = getItemProfit(item);
 
 						return (
 							<tr
@@ -89,6 +92,19 @@ export function InventoryTable({ items }: InventoryTableProps) {
 								</td>
 								<td className="px-3 py-3 whitespace-nowrap">
 									{formatCurrency(item.actual_sale_price)}
+								</td>
+								<td
+									className={cn(
+										"px-3 py-3 whitespace-nowrap",
+										profit != null &&
+											profit >= 0 &&
+											"text-[hsl(var(--success))]",
+										profit != null &&
+											profit < 0 &&
+											"text-[hsl(var(--destructive))]",
+									)}
+								>
+									{formatCurrency(profit)}
 								</td>
 							</tr>
 						);

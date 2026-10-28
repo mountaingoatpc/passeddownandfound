@@ -67,6 +67,7 @@ function DashboardPage() {
 				cost: row.cost,
 				projectedSale: row.projected_sale,
 				projectedProfit: row.projected_profit,
+				profit: row.profit,
 			})) ?? [],
 		[metrics],
 	);
@@ -121,6 +122,16 @@ function DashboardPage() {
 								description="Projected sale minus total cost"
 								valueClassName={
 									metrics.projected_profit >= 0
+										? "text-[hsl(var(--success))]"
+										: "text-[hsl(var(--destructive))]"
+								}
+							/>
+							<MetricCard
+								label="Profit"
+								value={formatCurrency(metrics.profit)}
+								description="Actual sale minus cost for items sold"
+								valueClassName={
+									metrics.profit >= 0
 										? "text-[hsl(var(--success))]"
 										: "text-[hsl(var(--destructive))]"
 								}
