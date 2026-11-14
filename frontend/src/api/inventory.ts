@@ -55,7 +55,10 @@ export interface InventoryMetricsCategoryRow {
 	cost: number;
 	projected_sale: number;
 	projected_profit: number;
+	gross_sales: number;
 	profit: number;
+	avg_sale_price: number;
+	avg_profit: number;
 }
 
 export interface InventoryMetricsResponse {
@@ -63,7 +66,10 @@ export interface InventoryMetricsResponse {
 	total_cost: number;
 	total_projected_sale: number;
 	projected_profit: number;
+	gross_sales: number;
 	profit: number;
+	avg_sale_price: number;
+	avg_profit: number;
 	items_sold: number;
 	by_category: InventoryMetricsCategoryRow[];
 }

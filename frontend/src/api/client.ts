@@ -1,6 +1,7 @@
 import { getConfig } from "@/config";
 
 const AUTH_TOKEN_KEY = "atticory_token";
+const REFRESH_TOKEN_KEY = "atticory_refresh_token";
 
 export class ApiError extends Error {
 	status: number;
@@ -21,13 +22,65 @@ export function setAuthToken(token: string): void {
 	localStorage.setItem(AUTH_TOKEN_KEY, token);
 }
 
+export function getRefreshToken(): string | null {
+	return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export function setRefreshToken(token: string): void {
+	localStorage.setItem(REFRESH_TOKEN_KEY, token);
+}
+
 export function removeAuthToken(): void {
 	localStorage.removeItem(AUTH_TOKEN_KEY);
+	localStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefreshSession(): Promise<boolean> {
+	if (refreshInFlight) {
+		return refreshInFlight;
+	}
+
+	refreshInFlight = (async () => {
+		const refreshToken = getRefreshToken();
+		if (!refreshToken) {
+			return false;
+		}
+
+		const { apiBaseUrl } = getConfig();
+		try {
+			const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ refresh_token: refreshToken }),
+			});
+			if (!response.ok) {
+				return false;
+			}
+			const data = (await response.json()) as {
+				token: string;
+				refresh_token?: string;
+			};
+			setAuthToken(data.token);
+			if (data.refresh_token) {
+				setRefreshToken(data.refresh_token);
+			}
+			return true;
+		} catch {
+			return false;
+		} finally {
+			refreshInFlight = null;
+		}
+	})();
+
+	return refreshInFlight;
 }
 
 export async function fetchApi<T>(
 	endpoint: string,
 	options: RequestInit = {},
+	retried = false,
 ): Promise<T> {
 	const { apiBaseUrl } = getConfig();
 	const token = getAuthToken();
@@ -60,6 +113,12 @@ export async function fetchApi<T>(
 	}
 
 	if (response.status === 401) {
+		if (!retried && endpoint !== "/auth/refresh") {
+			const refreshed = await tryRefreshSession();
+			if (refreshed) {
+				return fetchApi<T>(endpoint, options, true);
+			}
+		}
 		removeAuthToken();
 		window.location.href = "/login";
 		throw new ApiError(response.status, response.statusText, "Unauthorized");
