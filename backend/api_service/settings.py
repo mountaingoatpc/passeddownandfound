@@ -30,7 +30,8 @@ class Settings(BaseSettings):
 
     jwt_secret: str = "dev-secret-change-me-in-production"
     jwt_algorithm: str = "HS256"
-    jwt_expiration_hours: int = 24
+    jwt_expiration_hours: int = 1
+    jwt_refresh_expiration_days: int = 30
 
     frontend_url: str = "http://localhost:5173"
     uploads_dir: str = "uploads"

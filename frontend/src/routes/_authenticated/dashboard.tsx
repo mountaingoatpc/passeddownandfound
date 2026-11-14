@@ -67,7 +67,10 @@ function DashboardPage() {
 				cost: row.cost,
 				projectedSale: row.projected_sale,
 				projectedProfit: row.projected_profit,
+				grossSales: row.gross_sales,
 				profit: row.profit,
+				avgSalePrice: row.avg_sale_price,
+				avgProfit: row.avg_profit,
 			})) ?? [],
 		[metrics],
 	);
@@ -127,11 +130,31 @@ function DashboardPage() {
 								}
 							/>
 							<MetricCard
+								label="Gross Sales"
+								value={formatCurrency(metrics.gross_sales)}
+								description="Sum of actual sale prices × quantity"
+							/>
+							<MetricCard
 								label="Profit"
 								value={formatCurrency(metrics.profit)}
 								description="Actual sale minus cost for items sold"
 								valueClassName={
 									metrics.profit >= 0
+										? "text-[hsl(var(--success))]"
+										: "text-[hsl(var(--destructive))]"
+								}
+							/>
+							<MetricCard
+								label="Avg Sale Price"
+								value={formatCurrency(metrics.avg_sale_price)}
+								description="Average actual sale price for items sold"
+							/>
+							<MetricCard
+								label="Avg Profit"
+								value={formatCurrency(metrics.avg_profit)}
+								description="Average profit for items sold"
+								valueClassName={
+									metrics.avg_profit >= 0
 										? "text-[hsl(var(--success))]"
 										: "text-[hsl(var(--destructive))]"
 								}

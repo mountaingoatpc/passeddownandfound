@@ -18,7 +18,12 @@ class UserResponse(BaseModel):
 
 class AuthResponse(BaseModel):
     token: str
+    refresh_token: str
     user: UserResponse
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 class ComparableListingResponse(BaseModel):
@@ -118,7 +123,10 @@ class CategoryMetricRow(BaseModel):
     cost: float
     projected_sale: float
     projected_profit: float
+    gross_sales: float
     profit: float
+    avg_sale_price: float
+    avg_profit: float
 
 
 class InventoryMetricsResponse(BaseModel):
@@ -126,7 +134,10 @@ class InventoryMetricsResponse(BaseModel):
     total_cost: float
     total_projected_sale: float
     projected_profit: float
+    gross_sales: float
     profit: float
+    avg_sale_price: float
+    avg_profit: float
     items_sold: int
     by_category: list[CategoryMetricRow]
 

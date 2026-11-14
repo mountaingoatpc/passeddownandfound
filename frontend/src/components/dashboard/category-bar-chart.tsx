@@ -13,7 +13,11 @@ interface CategoryBarChartProps {
 }
 
 function getBarColor(metric: CategoryChartMetric, value: number): string {
-	if (metric === "projected_profit" || metric === "profit") {
+	if (
+		metric === "projected_profit" ||
+		metric === "profit" ||
+		metric === "avg_profit"
+	) {
 		return value >= 0
 			? "bg-[hsl(var(--success))]"
 			: "bg-[hsl(var(--destructive))]";

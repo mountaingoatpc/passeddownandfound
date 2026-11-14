@@ -1,0 +1,3 @@
+// Set this to your Railway production API URL before shipping.
+API_BASE_URL = https:/$()/api.atticory.com
+PRODUCT_NAME = Atticory

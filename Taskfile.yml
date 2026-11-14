@@ -72,6 +72,19 @@ tasks:
     cmds:
       - bun run check
 
+  ios:generate:
+    desc: Generate the Atticory Xcode project with XcodeGen
+    dir: ios
+    cmds:
+      - xcodegen generate
+
+  ios:open:
+    desc: Generate and open the Atticory iOS app in Xcode
+    dir: ios
+    cmds:
+      - xcodegen generate
+      - open Atticory.xcodeproj
+
   lint:
     desc: Run all linters (backend + frontend)
     cmds:

@@ -1,4 +1,9 @@
-import { fetchApi, removeAuthToken, setAuthToken } from "./client";
+import {
+	fetchApi,
+	removeAuthToken,
+	setAuthToken,
+	setRefreshToken,
+} from "./client";
 
 export interface User {
 	uuid: string;
@@ -7,7 +12,16 @@ export interface User {
 
 interface AuthResponse {
 	token: string;
+	refresh_token?: string;
 	user: User;
+}
+
+function persistAuth(res: AuthResponse): AuthResponse {
+	setAuthToken(res.token);
+	if (res.refresh_token) {
+		setRefreshToken(res.refresh_token);
+	}
+	return res;
 }
 
 export const authApi = {
@@ -16,8 +30,7 @@ export const authApi = {
 			method: "POST",
 			body: JSON.stringify({ email, password }),
 		});
-		setAuthToken(res.token);
-		return res;
+		return persistAuth(res);
 	},
 
 	async register(email: string, password: string): Promise<AuthResponse> {
@@ -25,8 +38,7 @@ export const authApi = {
 			method: "POST",
 			body: JSON.stringify({ email, password }),
 		});
-		setAuthToken(res.token);
-		return res;
+		return persistAuth(res);
 	},
 
 	async getMe(): Promise<User> {

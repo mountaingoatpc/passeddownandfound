@@ -27,13 +27,20 @@ from api_service.api_schemas import (
     ItemAnalysisResponse,
     LoginRequest,
     QueueAnalysisRequest,
+    RefreshRequest,
     RegisterRequest,
     UpdateCategoryRequest,
     UpdateInventoryItemRequest,
     UploadResponse,
     UserResponse,
 )
-from api_service.auth import create_token, get_current_user, hash_password, verify_password
+from api_service.auth import (
+    create_token_pair,
+    decode_token,
+    get_current_user,
+    hash_password,
+    verify_password,
+)
 from api_service.category_utils import categories_for_ai, categories_to_json, resolve_ai_category
 from api_service.image_storage import normalize_upload_extension, save_upload
 from api_service.route_metadata import route_metadata
@@ -206,6 +213,15 @@ async def health_check():
     return {"message": "healthy"}
 
 
+def _auth_response(user: dict) -> AuthResponse:
+    access_token, refresh_token = create_token_pair(str(user["uuid"]), user["email"])
+    return AuthResponse(
+        token=access_token,
+        refresh_token=refresh_token,
+        user=UserResponse(uuid=str(user["uuid"]), email=user["email"]),
+    )
+
+
 @app.post("/auth/register", response_model=AuthResponse, openapi_extra=route_metadata(Resource.AUTH, Permission.WRITE))
 async def register(request: RegisterRequest):
     existing = user_table.get_by_email(request.email.lower().strip())
@@ -216,8 +232,7 @@ async def register(request: RegisterRequest):
     if not user:
         raise HTTPException(status_code=500, detail="Failed to create user")
 
-    token = create_token(str(user["uuid"]), user["email"])
-    return AuthResponse(token=token, user=UserResponse(uuid=str(user["uuid"]), email=user["email"]))
+    return _auth_response(user)
 
 
 @app.post("/auth/login", response_model=AuthResponse, openapi_extra=route_metadata(Resource.AUTH, Permission.READ))
@@ -226,8 +241,16 @@ async def login(request: LoginRequest):
     if not user or not verify_password(request.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    token = create_token(str(user["uuid"]), user["email"])
-    return AuthResponse(token=token, user=UserResponse(uuid=str(user["uuid"]), email=user["email"]))
+    return _auth_response(user)
+
+
+@app.post("/auth/refresh", response_model=AuthResponse, openapi_extra=route_metadata(Resource.AUTH, Permission.READ))
+async def refresh(request: RefreshRequest):
+    payload = decode_token(request.refresh_token, expected_type="refresh")
+    user = user_table.get_by_uuid(payload["sub"])
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    return _auth_response(user)
 
 
 @app.get("/auth/me", response_model=UserResponse, openapi_extra=route_metadata(Resource.AUTH, Permission.READ))
@@ -429,7 +452,10 @@ async def get_inventory_metrics(current_user: dict = Depends(get_current_user)):
             cost=float(row["cost"]),
             projected_sale=float(row["projected_sale"]),
             projected_profit=float(row["projected_sale"]) - float(row["cost"]),
+            gross_sales=float(row["gross_sales"]),
             profit=float(row["profit"]),
+            avg_sale_price=float(row["avg_sale_price"]),
+            avg_profit=float(row["avg_profit"]),
         )
         for row in metrics["by_category"]
     ]
@@ -438,7 +464,10 @@ async def get_inventory_metrics(current_user: dict = Depends(get_current_user)):
         total_cost=metrics["total_cost"],
         total_projected_sale=metrics["total_projected_sale"],
         projected_profit=metrics["projected_profit"],
+        gross_sales=metrics["gross_sales"],
         profit=metrics["profit"],
+        avg_sale_price=metrics["avg_sale_price"],
+        avg_profit=metrics["avg_profit"],
         items_sold=metrics["items_sold"],
         by_category=by_category,
     )

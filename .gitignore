@@ -41,6 +41,18 @@ htmlcov/
 .idea/
 .vscode/
 
+# Xcode / iOS
+ios/DerivedData/
+**/xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+.swiftpm/
+
 # OS
 .DS_Store
 Thumbs.db

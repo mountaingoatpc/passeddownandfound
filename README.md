@@ -5,6 +5,7 @@ Inventory from the attic and beyond — sign in, photograph items on mobile, and
 ## Stack
 
 - **Frontend:** React 19, TanStack Router, Tailwind CSS v4, Bun
+- **iOS:** Native SwiftUI app (`ios/`) — camera-first inventory client
 - **Backend:** FastAPI, PostgreSQL, JWT auth
 - **Deploy:** Railway (see `GENERIC_APP.md` for full architecture)
 
@@ -57,6 +58,16 @@ task db:deploy ENV=prod
 
 See [guide_to_releases.md](guide_to_releases.md) for the full workflow.
 
-## Mobile Photo Capture
+## iOS app
+
+Native SwiftUI client in [`ios/`](ios/README.md):
+
+```bash
+cd ios && xcodegen generate && open Atticory.xcodeproj
+```
+
+Local Debug builds talk to `http://localhost:8092` (see `ios/README.md`).
+
+## Mobile Photo Capture (web)
 
 On mobile browsers, the Add Item page offers **Take Photo** (uses the device camera via `capture="environment"`) and **Gallery** to upload existing images.

@@ -235,7 +235,13 @@ class InventoryItemTable(Table):
                 f"COALESCE(SUM(cost * quantity), 0) AS total_cost, "
                 f"COALESCE(SUM(projected_sale_price * quantity), 0) AS total_projected_sale, "
                 f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
+                f"THEN actual_sale_price * quantity ELSE 0 END), 0) AS gross_sales, "
+                f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
                 f"THEN (actual_sale_price - cost) * quantity ELSE 0 END), 0) AS profit, "
+                f"COALESCE(AVG(actual_sale_price) FILTER (WHERE actual_sale_price > 0), 0) "
+                f"AS avg_sale_price, "
+                f"COALESCE(AVG(actual_sale_price - cost) FILTER (WHERE actual_sale_price > 0), 0) "
+                f"AS avg_profit, "
                 f"COUNT(*) FILTER (WHERE actual_sale_price > 0) AS items_sold "
                 f"FROM {self.fully_qualified_name} "
                 f"WHERE owner_uuid = %s AND {self._ACTIVE_FILTER}",
@@ -249,7 +255,13 @@ class InventoryItemTable(Table):
                     f"COALESCE(SUM(cost * quantity), 0) AS cost, "
                     f"COALESCE(SUM(projected_sale_price * quantity), 0) AS projected_sale, "
                     f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
-                    f"THEN (actual_sale_price - cost) * quantity ELSE 0 END), 0) AS profit "
+                    f"THEN actual_sale_price * quantity ELSE 0 END), 0) AS gross_sales, "
+                    f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
+                    f"THEN (actual_sale_price - cost) * quantity ELSE 0 END), 0) AS profit, "
+                    f"COALESCE(AVG(actual_sale_price) FILTER (WHERE actual_sale_price > 0), 0) "
+                    f"AS avg_sale_price, "
+                    f"COALESCE(AVG(actual_sale_price - cost) FILTER (WHERE actual_sale_price > 0), 0) "
+                    f"AS avg_profit "
                     f"FROM {self.fully_qualified_name} "
                     f"WHERE owner_uuid = %s AND {self._ACTIVE_FILTER} "
                     f"GROUP BY 1 ORDER BY 1",
@@ -267,7 +279,10 @@ class InventoryItemTable(Table):
             "total_cost": total_cost,
             "total_projected_sale": total_projected_sale,
             "projected_profit": total_projected_sale - total_cost,
+            "gross_sales": float(row.get("gross_sales", 0)),
             "profit": float(row.get("profit", 0)),
+            "avg_sale_price": float(row.get("avg_sale_price", 0)),
+            "avg_profit": float(row.get("avg_profit", 0)),
             "items_sold": int(row.get("items_sold", 0)),
             "by_category": by_category,
         }
