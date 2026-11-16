@@ -1,8 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { inventoryApi } from "@/api/inventory";
+import {
+	inventoryApi,
+	METRICS_PERIOD_OPTIONS,
+	type MetricsPeriod,
+} from "@/api/inventory";
 import { CategoryBarChart } from "@/components/dashboard/category-bar-chart";
+import {
+	MetricsOverTimeChart,
+	TIME_SERIES_METRIC_OPTIONS,
+	type TimeSeriesMetric,
+} from "@/components/dashboard/metrics-over-time-chart";
+import { SalesByPaymentChart } from "@/components/dashboard/sales-by-payment-chart";
 import { AppHeader } from "@/components/layout/app-header";
 import { cn } from "@/lib/cn";
 import { formatCurrency } from "@/lib/format-currency";
@@ -48,6 +58,8 @@ function MetricCard({
 }
 
 function DashboardPage() {
+	const [period, setPeriod] = useState<MetricsPeriod>("month");
+	const [timeMetric, setTimeMetric] = useState<TimeSeriesMetric>("gross_sales");
 	const [chartMetric, setChartMetric] =
 		useState<CategoryChartMetric>("projected_sale");
 
@@ -56,8 +68,8 @@ function DashboardPage() {
 		isLoading,
 		error,
 	} = useQuery({
-		queryKey: ["inventory-metrics"],
-		queryFn: () => inventoryApi.metrics(),
+		queryKey: ["inventory-metrics", period],
+		queryFn: () => inventoryApi.metrics({ period }),
 	});
 
 	const categoryMetrics = useMemo<CategoryMetricRow[]>(
@@ -75,16 +87,40 @@ function DashboardPage() {
 		[metrics],
 	);
 
+	const periodLabel =
+		METRICS_PERIOD_OPTIONS.find((option) => option.value === period)?.label ??
+		"Month";
+
 	return (
 		<div className="min-h-dvh">
 			<AppHeader title="Dashboard" />
 
 			<main className="mx-auto max-w-6xl space-y-6 px-4 py-4 safe-bottom">
-				<div>
-					<h2 className="text-lg font-semibold">Inventory Overview</h2>
-					<p className="text-sm text-[hsl(var(--muted-foreground))]">
-						Summary metrics across your inventory.
-					</p>
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+					<div>
+						<h2 className="text-lg font-semibold">Inventory Overview</h2>
+						<p className="text-sm text-[hsl(var(--muted-foreground))]">
+							Summary metrics across your inventory.
+						</p>
+					</div>
+					<label className="flex flex-col gap-1 text-sm">
+						<span className="text-[hsl(var(--muted-foreground))]">
+							Time dimension
+						</span>
+						<select
+							className={selectClassName}
+							value={period}
+							onChange={(event) =>
+								setPeriod(event.target.value as MetricsPeriod)
+							}
+						>
+							{METRICS_PERIOD_OPTIONS.map((option) => (
+								<option key={option.value} value={option.value}>
+									{option.label}
+								</option>
+							))}
+						</select>
+					</label>
 				</div>
 
 				{isLoading && (
@@ -165,6 +201,55 @@ function DashboardPage() {
 								description="Inventory items with an actual sale price recorded"
 							/>
 						</div>
+
+						<section className="rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm">
+							<div>
+								<h3 className="font-semibold">Sales by payment method</h3>
+								<p className="text-sm text-[hsl(var(--muted-foreground))]">
+									Gross sales over time by {periodLabel.toLowerCase()}, stacked
+									by how buyers paid.
+								</p>
+							</div>
+							<div className="mt-6">
+								<SalesByPaymentChart series={metrics.series} />
+							</div>
+						</section>
+
+						<section className="rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm">
+							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+								<div>
+									<h3 className="font-semibold">Metrics over time</h3>
+									<p className="text-sm text-[hsl(var(--muted-foreground))]">
+										Track sales metrics across the selected{" "}
+										{periodLabel.toLowerCase()} buckets.
+									</p>
+								</div>
+								<label className="flex flex-col gap-1 text-sm">
+									<span className="text-[hsl(var(--muted-foreground))]">
+										Metric
+									</span>
+									<select
+										className={selectClassName}
+										value={timeMetric}
+										onChange={(event) =>
+											setTimeMetric(event.target.value as TimeSeriesMetric)
+										}
+									>
+										{TIME_SERIES_METRIC_OPTIONS.map((option) => (
+											<option key={option.value} value={option.value}>
+												{option.label}
+											</option>
+										))}
+									</select>
+								</label>
+							</div>
+							<div className="mt-6">
+								<MetricsOverTimeChart
+									series={metrics.series}
+									metric={timeMetric}
+								/>
+							</div>
+						</section>
 
 						<section className="rounded-[var(--radius)] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 shadow-sm">
 							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -27,6 +27,12 @@ INVENTORY_ITEM_MIGRATIONS = [
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS analysis_error TEXT",
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS analysis_context TEXT",
     "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS partial_sale BOOLEAN NOT NULL DEFAULT false",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS units_sold INTEGER",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS payment_method TEXT",
+    "ALTER TABLE public.inventory_items ADD COLUMN IF NOT EXISTS sold_at TIMESTAMPTZ",
+    "UPDATE public.inventory_items SET sold_at = updated_at "
+    "WHERE actual_sale_price > 0 AND sold_at IS NULL AND deleted_at IS NULL",
 ]
 
 

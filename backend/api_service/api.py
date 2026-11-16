@@ -3,6 +3,7 @@ import json
 import logging
 import math
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -26,6 +27,9 @@ from api_service.api_schemas import (
     ItemAiEvidence,
     ItemAnalysisResponse,
     LoginRequest,
+    MetricsPeriod,
+    MetricsSeriesPoint,
+    PaymentMethodSales,
     QueueAnalysisRequest,
     RefreshRequest,
     RegisterRequest,
@@ -100,6 +104,10 @@ def _serialize_item(row: dict) -> InventoryItemResponse:
         cost=float(row["cost"]),
         projected_sale_price=float(row["projected_sale_price"]),
         actual_sale_price=float(row["actual_sale_price"]) if row["actual_sale_price"] is not None else None,
+        partial_sale=bool(row.get("partial_sale") or False),
+        units_sold=int(row["units_sold"]) if row.get("units_sold") is not None else None,
+        payment_method=row.get("payment_method"),
+        sold_at=row["sold_at"].isoformat() if row.get("sold_at") is not None else None,
         image_urls=_serialize_image_urls(row),
         ai_evidence=_serialize_ai_evidence(row.get("ai_evidence")),
         analysis_status=row.get("analysis_status") or "none",
@@ -108,6 +116,35 @@ def _serialize_item(row: dict) -> InventoryItemResponse:
         created_at=row["created_at"].isoformat(),
         updated_at=row["updated_at"].isoformat(),
     )
+
+
+def _is_sold(actual_sale_price: float | None) -> bool:
+    return actual_sale_price is not None and actual_sale_price > 0
+
+
+def _apply_sold_at_on_update(updates: dict, existing: dict) -> None:
+    """Keep sold_at in sync when actual_sale_price is created, kept, or cleared."""
+    if "actual_sale_price" not in updates and "sold_at" not in updates:
+        return
+
+    next_price = updates.get(
+        "actual_sale_price",
+        float(existing["actual_sale_price"]) if existing.get("actual_sale_price") is not None else None,
+    )
+    if not _is_sold(next_price):
+        updates["sold_at"] = None
+        return
+
+    if updates.get("sold_at") is not None:
+        return
+
+    existing_sold_at = existing.get("sold_at")
+    if existing_sold_at is not None and _is_sold(
+        float(existing["actual_sale_price"]) if existing.get("actual_sale_price") is not None else None
+    ):
+        updates["sold_at"] = existing_sold_at
+    else:
+        updates["sold_at"] = datetime.now(timezone.utc)
 
 
 def _serialize_item_summary(row: dict) -> InventoryItemSummary:
@@ -444,8 +481,12 @@ async def list_inventory(
     response_model=InventoryMetricsResponse,
     openapi_extra=route_metadata(Resource.INVENTORY, Permission.READ),
 )
-async def get_inventory_metrics(current_user: dict = Depends(get_current_user)):
+async def get_inventory_metrics(
+    current_user: dict = Depends(get_current_user),
+    period: MetricsPeriod = Query(default="month"),
+):
     metrics = inventory_table.get_metrics_for_owner(current_user["uuid"])
+    series_rows = inventory_table.get_metrics_series_for_owner(current_user["uuid"], period)
     by_category = [
         CategoryMetricRow(
             category=row["category"],
@@ -459,6 +500,18 @@ async def get_inventory_metrics(current_user: dict = Depends(get_current_user)):
         )
         for row in metrics["by_category"]
     ]
+    series = [
+        MetricsSeriesPoint(
+            bucket=row["bucket"],
+            label=row["label"],
+            gross_sales=row["gross_sales"],
+            profit=row["profit"],
+            items_sold=row["items_sold"],
+            avg_sale_price=row["avg_sale_price"],
+            by_payment_method=PaymentMethodSales(**row["by_payment_method"]),
+        )
+        for row in series_rows
+    ]
     return InventoryMetricsResponse(
         total_items=metrics["total_items"],
         total_cost=metrics["total_cost"],
@@ -470,6 +523,8 @@ async def get_inventory_metrics(current_user: dict = Depends(get_current_user)):
         avg_profit=metrics["avg_profit"],
         items_sold=metrics["items_sold"],
         by_category=by_category,
+        period=period,
+        series=series,
     )
 
 
@@ -498,6 +553,7 @@ async def create_inventory_item(
         else None
     )
 
+    sold_at = datetime.now(timezone.utc) if _is_sold(request.actual_sale_price) else None
     result = inventory_table.create(
         owner_uuid=current_user["uuid"],
         name=request.name.strip(),
@@ -511,6 +567,10 @@ async def create_inventory_item(
         cost=request.cost,
         projected_sale_price=request.projected_sale_price,
         actual_sale_price=request.actual_sale_price,
+        partial_sale=request.partial_sale,
+        units_sold=request.units_sold,
+        payment_method=request.payment_method,
+        sold_at=sold_at,
         image_urls=request.image_urls,
         ai_evidence=request.ai_evidence.model_dump() if request.ai_evidence else None,
         analysis_status=analysis_status,
@@ -557,6 +617,36 @@ async def update_inventory_item(
 
     run_analysis = updates.pop("run_analysis", None)
     analysis_context = updates.pop("analysis_context", None)
+
+    sale_fields = {"partial_sale", "units_sold", "quantity", "actual_sale_price", "sold_at"}
+    existing = None
+    if sale_fields & updates.keys():
+        existing = inventory_table.get_by_uuid(item_uuid, current_user["uuid"])
+        if not existing:
+            raise HTTPException(status_code=404, detail="Item not found")
+
+    if existing is not None and {"partial_sale", "units_sold", "quantity"} & updates.keys():
+        partial_sale = updates.get("partial_sale", bool(existing.get("partial_sale") or False))
+        quantity = int(updates.get("quantity", existing.get("quantity") or 1))
+        units_sold = updates.get(
+            "units_sold",
+            int(existing["units_sold"]) if existing.get("units_sold") is not None else None,
+        )
+        if partial_sale:
+            if units_sold is None:
+                raise HTTPException(status_code=400, detail="units_sold is required for a partial sale")
+            if units_sold < 1:
+                raise HTTPException(status_code=400, detail="units_sold must be at least 1")
+            if units_sold > quantity:
+                raise HTTPException(status_code=400, detail="units_sold cannot exceed quantity")
+            updates["units_sold"] = units_sold
+            updates["partial_sale"] = True
+        else:
+            updates["partial_sale"] = False
+            updates["units_sold"] = None
+
+    if existing is not None:
+        _apply_sold_at_on_update(updates, existing)
 
     result = inventory_table.update(item_uuid, current_user["uuid"], updates)
     if not result:

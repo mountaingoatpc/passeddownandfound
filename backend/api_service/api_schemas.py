@@ -1,4 +1,9 @@
-from pydantic import BaseModel, Field, field_validator
+from typing import Literal
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+PaymentMethod = Literal["cash", "venmo", "paypal", "facebook_pay"]
+MetricsPeriod = Literal["week", "month", "year"]
 
 
 class RegisterRequest(BaseModel):
@@ -50,6 +55,23 @@ def _validate_image_urls(value: list[str]) -> list[str]:
     return cleaned
 
 
+def _normalize_partial_sale_fields(
+    *,
+    partial_sale: bool,
+    units_sold: int | None,
+    quantity: int | None,
+) -> int | None:
+    if not partial_sale:
+        return None
+    if units_sold is None:
+        raise ValueError("units_sold is required for a partial sale")
+    if units_sold < 1:
+        raise ValueError("units_sold must be at least 1")
+    if quantity is not None and units_sold > quantity:
+        raise ValueError("units_sold cannot exceed quantity")
+    return units_sold
+
+
 class CreateInventoryItemRequest(BaseModel):
     name: str = Field(min_length=1)
     category: str = ""
@@ -62,6 +84,9 @@ class CreateInventoryItemRequest(BaseModel):
     cost: float = Field(ge=0)
     projected_sale_price: float = Field(ge=0)
     actual_sale_price: float | None = Field(default=None, ge=0)
+    partial_sale: bool = False
+    units_sold: int | None = Field(default=None, ge=1)
+    payment_method: PaymentMethod | None = None
     image_urls: list[str] = Field(default_factory=list, max_length=4)
     ai_evidence: ItemAiEvidence | None = None
     run_analysis: bool = False
@@ -71,6 +96,15 @@ class CreateInventoryItemRequest(BaseModel):
     @classmethod
     def validate_image_urls(cls, value: list[str]) -> list[str]:
         return _validate_image_urls(value)
+
+    @model_validator(mode="after")
+    def validate_partial_sale(self) -> "CreateInventoryItemRequest":
+        self.units_sold = _normalize_partial_sale_fields(
+            partial_sale=self.partial_sale,
+            units_sold=self.units_sold,
+            quantity=self.quantity,
+        )
+        return self
 
 
 class UpdateInventoryItemRequest(BaseModel):
@@ -85,6 +119,9 @@ class UpdateInventoryItemRequest(BaseModel):
     cost: float | None = Field(default=None, ge=0)
     projected_sale_price: float | None = Field(default=None, ge=0)
     actual_sale_price: float | None = Field(default=None, ge=0)
+    partial_sale: bool | None = None
+    units_sold: int | None = Field(default=None, ge=1)
+    payment_method: PaymentMethod | None = None
     image_urls: list[str] | None = Field(default=None, max_length=4)
     ai_evidence: ItemAiEvidence | None = None
     run_analysis: bool | None = None
@@ -96,6 +133,21 @@ class UpdateInventoryItemRequest(BaseModel):
         if value is None:
             return None
         return _validate_image_urls(value)
+
+    @model_validator(mode="after")
+    def validate_partial_sale(self) -> "UpdateInventoryItemRequest":
+        if self.partial_sale is False:
+            self.units_sold = None
+            return self
+        if self.partial_sale is True:
+            self.units_sold = _normalize_partial_sale_fields(
+                partial_sale=True,
+                units_sold=self.units_sold,
+                quantity=self.quantity,
+            )
+        elif self.units_sold is not None and self.quantity is not None and self.units_sold > self.quantity:
+            raise ValueError("units_sold cannot exceed quantity")
+        return self
 
 
 class InventoryItemSummary(BaseModel):
@@ -129,6 +181,24 @@ class CategoryMetricRow(BaseModel):
     avg_profit: float
 
 
+class PaymentMethodSales(BaseModel):
+    cash: float = 0
+    venmo: float = 0
+    paypal: float = 0
+    facebook_pay: float = 0
+    unknown: float = 0
+
+
+class MetricsSeriesPoint(BaseModel):
+    bucket: str
+    label: str
+    gross_sales: float
+    profit: float
+    items_sold: int
+    avg_sale_price: float
+    by_payment_method: PaymentMethodSales
+
+
 class InventoryMetricsResponse(BaseModel):
     total_items: int
     total_cost: float
@@ -140,6 +210,8 @@ class InventoryMetricsResponse(BaseModel):
     avg_profit: float
     items_sold: int
     by_category: list[CategoryMetricRow]
+    period: MetricsPeriod = "month"
+    series: list[MetricsSeriesPoint] = Field(default_factory=list)
 
 
 class InventoryItemResponse(BaseModel):
@@ -155,6 +227,10 @@ class InventoryItemResponse(BaseModel):
     cost: float
     projected_sale_price: float
     actual_sale_price: float | None
+    partial_sale: bool = False
+    units_sold: int | None = None
+    payment_method: PaymentMethod | None = None
+    sold_at: str | None = None
     image_urls: list[str]
     ai_evidence: ItemAiEvidence | None = None
     analysis_status: str

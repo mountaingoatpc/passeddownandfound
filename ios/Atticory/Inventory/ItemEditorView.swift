@@ -110,6 +110,20 @@ struct ItemEditorView: View {
                 Toggle("Sold", isOn: $viewModel.hasActualSale)
                 if viewModel.hasActualSale {
                     moneyField("Actual sale", value: $viewModel.actualSalePrice)
+                    Toggle("Partial sale", isOn: $viewModel.partialSale)
+                    if viewModel.partialSale {
+                        Stepper(
+                            "Units sold: \(viewModel.unitsSold)",
+                            value: $viewModel.unitsSold,
+                            in: 1 ... max(1, viewModel.quantity)
+                        )
+                    }
+                    Picker("Payment method", selection: $viewModel.paymentMethod) {
+                        Text("Select…").tag(Optional<PaymentMethod>.none)
+                        ForEach(PaymentMethod.allCases) { method in
+                            Text(method.label).tag(Optional(method))
+                        }
+                    }
                 }
             }
 
@@ -264,6 +278,9 @@ final class ItemEditorViewModel: ObservableObject {
     @Published var projectedSalePrice: Double = 0
     @Published var hasActualSale = false
     @Published var actualSalePrice: Double = 0
+    @Published var partialSale = false
+    @Published var unitsSold = 1
+    @Published var paymentMethod: PaymentMethod?
     @Published var existingImageURLs: [String] = []
     @Published var localImages: [UIImage] = []
     @Published var categories: [Category] = []
@@ -299,6 +316,9 @@ final class ItemEditorViewModel: ObservableObject {
                 hasActualSale = true
                 actualSalePrice = actual
             }
+            partialSale = item.partialSale
+            unitsSold = item.unitsSold ?? 1
+            paymentMethod = item.paymentMethod
             existingImageURLs = item.imageUrls
             aiEvidence = item.aiEvidence
         }
@@ -409,6 +429,14 @@ final class ItemEditorViewModel: ObservableObject {
 
             let condition = ParsedCondition(type: conditionType, grade: conditionGrade).serialize()
             let actual: Double? = hasActualSale ? actualSalePrice : nil
+            let isPartial = hasActualSale && partialSale
+            let soldUnits: Int? = isPartial ? min(max(unitsSold, 1), quantity) : nil
+            let method: PaymentMethod? = hasActualSale ? paymentMethod : nil
+
+            if isPartial, unitsSold > quantity {
+                errorMessage = "Units sold cannot exceed quantity."
+                return false
+            }
 
             switch mode {
             case .create:
@@ -424,6 +452,9 @@ final class ItemEditorViewModel: ObservableObject {
                     cost: cost,
                     projectedSalePrice: projectedSalePrice,
                     actualSalePrice: actual,
+                    partialSale: isPartial,
+                    unitsSold: soldUnits,
+                    paymentMethod: method,
                     imageUrls: uploaded,
                     aiEvidence: aiEvidence,
                     runAnalysis: runAnalysisAfterSave,
@@ -444,6 +475,9 @@ final class ItemEditorViewModel: ObservableObject {
                     cost: cost,
                     projectedSalePrice: projectedSalePrice,
                     actualSalePrice: actual,
+                    partialSale: isPartial,
+                    unitsSold: soldUnits,
+                    paymentMethod: method,
                     imageUrls: uploaded,
                     aiEvidence: aiEvidence,
                     runAnalysis: runAnalysisAfterSave ? true : nil,

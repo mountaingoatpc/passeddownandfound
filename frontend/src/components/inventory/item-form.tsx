@@ -3,7 +3,12 @@ import { Link } from "@tanstack/react-router";
 import { Sparkles } from "lucide-react";
 import { useState } from "react";
 import { categoriesApi } from "@/api/categories";
-import type { AnalysisStatus, ItemAiEvidence } from "@/api/inventory";
+import type {
+	AnalysisStatus,
+	ItemAiEvidence,
+	PaymentMethod,
+} from "@/api/inventory";
+import { PAYMENT_METHOD_OPTIONS } from "@/api/inventory";
 import { AnalysisProgressBanner } from "@/components/inventory/analysis-progress-banner";
 import { AnalyzeDialog } from "@/components/inventory/analyze-dialog";
 import { ConditionPicker } from "@/components/inventory/condition-picker";
@@ -39,6 +44,9 @@ export interface ItemFormValues {
 	cost: number;
 	projected_sale_price: number;
 	actual_sale_price: number | null;
+	partial_sale: boolean;
+	units_sold: number | null;
+	payment_method: PaymentMethod | null;
 	images: ItemFormImage[];
 	aiEvidence: ItemAiEvidence | null;
 }
@@ -101,6 +109,15 @@ export function ItemForm({
 	const [actualSalePrice, setActualSalePrice] = useState(
 		formatCurrencyInputValue(initialValues?.actual_sale_price),
 	);
+	const [partialSale, setPartialSale] = useState(
+		initialValues?.partial_sale ?? false,
+	);
+	const [unitsSold, setUnitsSold] = useState(
+		numberToField(initialValues?.units_sold ?? undefined),
+	);
+	const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">(
+		initialValues?.payment_method ?? "",
+	);
 	const [images, setImages] = useState<ItemFormImage[]>(
 		initialValues?.images ?? [],
 	);
@@ -138,23 +155,33 @@ export function ItemForm({
 		setAnalyzeDialogError(null);
 	};
 
-	const buildFormValues = (options: { allowEmptyName?: boolean } = {}) => ({
-		name: name.trim() || (options.allowEmptyName ? "New item" : ""),
-		category: category.trim(),
-		description: description.trim(),
-		condition,
-		quantity: Number.parseInt(quantity, 10) || 1,
-		weight_pounds: Number.parseInt(weightPounds, 10) || 0,
-		weight_ounces: Number.parseFloat(weightOunces) || 0,
-		starting_bid: Number.parseFloat(startingBid) || 0,
-		cost: Number.parseFloat(cost) || 0,
-		projected_sale_price: Number.parseFloat(projectedSalePrice) || 0,
-		actual_sale_price: actualSalePrice
-			? Number.parseFloat(actualSalePrice)
-			: null,
-		images,
-		aiEvidence: hasAiEvidence(aiEvidence) ? aiEvidence : null,
-	});
+	const buildFormValues = (options: { allowEmptyName?: boolean } = {}) => {
+		const parsedQuantity = Number.parseInt(quantity, 10) || 1;
+		const parsedUnitsSold = Number.parseInt(unitsSold, 10);
+		return {
+			name: name.trim() || (options.allowEmptyName ? "New item" : ""),
+			category: category.trim(),
+			description: description.trim(),
+			condition,
+			quantity: parsedQuantity,
+			weight_pounds: Number.parseInt(weightPounds, 10) || 0,
+			weight_ounces: Number.parseFloat(weightOunces) || 0,
+			starting_bid: Number.parseFloat(startingBid) || 0,
+			cost: Number.parseFloat(cost) || 0,
+			projected_sale_price: Number.parseFloat(projectedSalePrice) || 0,
+			actual_sale_price: actualSalePrice
+				? Number.parseFloat(actualSalePrice)
+				: null,
+			partial_sale: partialSale,
+			units_sold:
+				partialSale && Number.isFinite(parsedUnitsSold)
+					? parsedUnitsSold
+					: null,
+			payment_method: paymentMethod || null,
+			images,
+			aiEvidence: hasAiEvidence(aiEvidence) ? aiEvidence : null,
+		};
+	};
 
 	const validateForm = (options: { requireName?: boolean } = {}) => {
 		if (options.requireName && !name.trim()) {
@@ -163,6 +190,17 @@ export function ItemForm({
 
 		if (condition && !isConditionComplete(condition)) {
 			return "Please select a condition grade for pre-owned items.";
+		}
+
+		if (partialSale) {
+			const parsedQuantity = Number.parseInt(quantity, 10) || 1;
+			const parsedUnitsSold = Number.parseInt(unitsSold, 10);
+			if (!Number.isFinite(parsedUnitsSold) || parsedUnitsSold < 1) {
+				return "Enter how many units sold for a partial sale.";
+			}
+			if (parsedUnitsSold > parsedQuantity) {
+				return "Units sold cannot exceed quantity.";
+			}
 		}
 
 		return null;
@@ -445,6 +483,59 @@ export function ItemForm({
 								onChange={(e) => setActualSalePrice(e.target.value)}
 								placeholder="Optional"
 							/>
+						</div>
+					</div>
+
+					<div className="space-y-3">
+						<label className="flex items-center gap-2 text-sm font-medium">
+							<input
+								type="checkbox"
+								checked={partialSale}
+								onChange={(e) => setPartialSale(e.target.checked)}
+								disabled={formDisabled}
+								className="h-4 w-4 rounded border-[hsl(var(--input))]"
+							/>
+							Partial sale
+						</label>
+						{partialSale && (
+							<div className="space-y-2">
+								<label htmlFor="units-sold" className="text-sm font-medium">
+									Units sold
+								</label>
+								<Input
+									id="units-sold"
+									type="number"
+									inputMode="numeric"
+									min="1"
+									max={quantity || undefined}
+									step="1"
+									value={unitsSold}
+									onChange={(e) => setUnitsSold(e.target.value)}
+									placeholder="How many sold"
+									disabled={formDisabled}
+								/>
+							</div>
+						)}
+						<div className="space-y-2">
+							<label htmlFor="payment-method" className="text-sm font-medium">
+								Payment method
+							</label>
+							<select
+								id="payment-method"
+								value={paymentMethod}
+								onChange={(e) =>
+									setPaymentMethod(e.target.value as PaymentMethod | "")
+								}
+								className={selectClassName}
+								disabled={formDisabled}
+							>
+								<option value="">Select payment method</option>
+								{PAYMENT_METHOD_OPTIONS.map((option) => (
+									<option key={option.value} value={option.value}>
+										{option.label}
+									</option>
+								))}
+							</select>
 						</div>
 					</div>
 

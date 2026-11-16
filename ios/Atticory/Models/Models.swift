@@ -125,6 +125,24 @@ struct InventoryListResponse: Codable, Sendable {
     }
 }
 
+enum PaymentMethod: String, Codable, CaseIterable, Identifiable, Sendable {
+    case cash
+    case venmo
+    case paypal
+    case facebookPay = "facebook_pay"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .cash: return "Cash"
+        case .venmo: return "Venmo"
+        case .paypal: return "PayPal"
+        case .facebookPay: return "Facebook Pay"
+        }
+    }
+}
+
 struct InventoryItem: Codable, Identifiable, Equatable, Sendable {
     var id: String { uuid }
     let uuid: String
@@ -139,6 +157,10 @@ struct InventoryItem: Codable, Identifiable, Equatable, Sendable {
     var cost: Double
     var projectedSalePrice: Double
     var actualSalePrice: Double?
+    var partialSale: Bool
+    var unitsSold: Int?
+    var paymentMethod: PaymentMethod?
+    var soldAt: String?
     var imageUrls: [String]
     var aiEvidence: ItemAiEvidence?
     var analysisStatus: AnalysisStatus
@@ -154,6 +176,10 @@ struct InventoryItem: Codable, Identifiable, Equatable, Sendable {
         case startingBid = "starting_bid"
         case projectedSalePrice = "projected_sale_price"
         case actualSalePrice = "actual_sale_price"
+        case partialSale = "partial_sale"
+        case unitsSold = "units_sold"
+        case paymentMethod = "payment_method"
+        case soldAt = "sold_at"
         case imageUrls = "image_urls"
         case aiEvidence = "ai_evidence"
         case analysisStatus = "analysis_status"
@@ -161,6 +187,33 @@ struct InventoryItem: Codable, Identifiable, Equatable, Sendable {
         case ownerUuid = "owner_uuid"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        uuid = try container.decode(String.self, forKey: .uuid)
+        name = try container.decode(String.self, forKey: .name)
+        category = try container.decodeIfPresent(String.self, forKey: .category) ?? ""
+        description = try container.decodeIfPresent(String.self, forKey: .description) ?? ""
+        condition = try container.decodeIfPresent(String.self, forKey: .condition) ?? ""
+        quantity = try container.decodeIfPresent(Int.self, forKey: .quantity) ?? 1
+        weightPounds = try container.decodeIfPresent(Int.self, forKey: .weightPounds) ?? 0
+        weightOunces = try container.decodeIfPresent(Double.self, forKey: .weightOunces) ?? 0
+        startingBid = try container.decodeIfPresent(Double.self, forKey: .startingBid) ?? 0
+        cost = try container.decode(Double.self, forKey: .cost)
+        projectedSalePrice = try container.decode(Double.self, forKey: .projectedSalePrice)
+        actualSalePrice = try container.decodeIfPresent(Double.self, forKey: .actualSalePrice)
+        partialSale = try container.decodeIfPresent(Bool.self, forKey: .partialSale) ?? false
+        unitsSold = try container.decodeIfPresent(Int.self, forKey: .unitsSold)
+        paymentMethod = try container.decodeIfPresent(PaymentMethod.self, forKey: .paymentMethod)
+        soldAt = try container.decodeIfPresent(String.self, forKey: .soldAt)
+        imageUrls = try container.decodeIfPresent([String].self, forKey: .imageUrls) ?? []
+        aiEvidence = try container.decodeIfPresent(ItemAiEvidence.self, forKey: .aiEvidence)
+        analysisStatus = try container.decodeIfPresent(AnalysisStatus.self, forKey: .analysisStatus) ?? .none
+        analysisError = try container.decodeIfPresent(String.self, forKey: .analysisError)
+        ownerUuid = try container.decode(String.self, forKey: .ownerUuid)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+        updatedAt = try container.decode(String.self, forKey: .updatedAt)
     }
 }
 
@@ -176,6 +229,9 @@ struct CreateInventoryItemRequest: Encodable, Sendable {
     var cost: Double
     var projectedSalePrice: Double
     var actualSalePrice: Double?
+    var partialSale: Bool = false
+    var unitsSold: Int?
+    var paymentMethod: PaymentMethod?
     var imageUrls: [String] = []
     var aiEvidence: ItemAiEvidence?
     var runAnalysis: Bool = false
@@ -188,6 +244,9 @@ struct CreateInventoryItemRequest: Encodable, Sendable {
         case startingBid = "starting_bid"
         case projectedSalePrice = "projected_sale_price"
         case actualSalePrice = "actual_sale_price"
+        case partialSale = "partial_sale"
+        case unitsSold = "units_sold"
+        case paymentMethod = "payment_method"
         case imageUrls = "image_urls"
         case aiEvidence = "ai_evidence"
         case runAnalysis = "run_analysis"
@@ -207,6 +266,9 @@ struct UpdateInventoryItemRequest: Encodable, Sendable {
     var cost: Double?
     var projectedSalePrice: Double?
     var actualSalePrice: Double?
+    var partialSale: Bool?
+    var unitsSold: Int?
+    var paymentMethod: PaymentMethod?
     var imageUrls: [String]?
     var aiEvidence: ItemAiEvidence?
     var runAnalysis: Bool?
@@ -219,6 +281,9 @@ struct UpdateInventoryItemRequest: Encodable, Sendable {
         case startingBid = "starting_bid"
         case projectedSalePrice = "projected_sale_price"
         case actualSalePrice = "actual_sale_price"
+        case partialSale = "partial_sale"
+        case unitsSold = "units_sold"
+        case paymentMethod = "payment_method"
         case imageUrls = "image_urls"
         case aiEvidence = "ai_evidence"
         case runAnalysis = "run_analysis"

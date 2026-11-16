@@ -1,7 +1,17 @@
-from typing import Any
+from datetime import datetime
+from typing import Any, Literal
 
 from lib.database.database import Database
 from lib.database.schemas import Column, ColumnType, Index, Record, Table
+
+MetricsPeriod = Literal["week", "month", "year"]
+
+_PERIOD_SERIES: dict[MetricsPeriod, tuple[str, str, int]] = {
+    # trunc unit, generate_series step, number of buckets
+    "week": ("week", "1 week", 12),
+    "month": ("month", "1 month", 12),
+    "year": ("year", "1 year", 5),
+}
 
 
 class UserLoginTable(Table):
@@ -160,6 +170,10 @@ class InventoryItemTable(Table):
         Column(name="cost", column_type=ColumnType.REAL, nullable=False, default="0"),
         Column(name="projected_sale_price", column_type=ColumnType.REAL, nullable=False, default="0"),
         Column(name="actual_sale_price", column_type=ColumnType.REAL, nullable=True),
+        Column(name="partial_sale", column_type=ColumnType.BOOLEAN, nullable=False, default="false"),
+        Column(name="units_sold", column_type=ColumnType.INTEGER, nullable=True),
+        Column(name="payment_method", column_type=ColumnType.TEXT, nullable=True),
+        Column(name="sold_at", column_type=ColumnType.TIMESTAMPTZ, nullable=True),
         Column(name="image_url", column_type=ColumnType.TEXT, nullable=True),
         Column(name="image_urls", column_type=ColumnType.JSONB, nullable=False, default="'[]'"),
         Column(name="ai_evidence", column_type=ColumnType.JSONB, nullable=True),
@@ -226,6 +240,13 @@ class InventoryItemTable(Table):
                 or []
             )
 
+    # Units counted toward a recorded sale: full quantity, or units_sold when partial.
+    _SOLD_UNITS = (
+        "CASE WHEN actual_sale_price > 0 THEN "
+        "CASE WHEN partial_sale THEN COALESCE(units_sold, 0) ELSE quantity END "
+        "ELSE 0 END"
+    )
+
     def get_metrics_for_owner(self, owner_uuid: str) -> dict[str, Any]:
         db = Database()
         with db:
@@ -234,10 +255,8 @@ class InventoryItemTable(Table):
                 f"COUNT(*) AS total_items, "
                 f"COALESCE(SUM(cost * quantity), 0) AS total_cost, "
                 f"COALESCE(SUM(projected_sale_price * quantity), 0) AS total_projected_sale, "
-                f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
-                f"THEN actual_sale_price * quantity ELSE 0 END), 0) AS gross_sales, "
-                f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
-                f"THEN (actual_sale_price - cost) * quantity ELSE 0 END), 0) AS profit, "
+                f"COALESCE(SUM(actual_sale_price * ({self._SOLD_UNITS})), 0) AS gross_sales, "
+                f"COALESCE(SUM((actual_sale_price - cost) * ({self._SOLD_UNITS})), 0) AS profit, "
                 f"COALESCE(AVG(actual_sale_price) FILTER (WHERE actual_sale_price > 0), 0) "
                 f"AS avg_sale_price, "
                 f"COALESCE(AVG(actual_sale_price - cost) FILTER (WHERE actual_sale_price > 0), 0) "
@@ -254,10 +273,8 @@ class InventoryItemTable(Table):
                     f"COALESCE(NULLIF(TRIM(category), ''), %s) AS category, "
                     f"COALESCE(SUM(cost * quantity), 0) AS cost, "
                     f"COALESCE(SUM(projected_sale_price * quantity), 0) AS projected_sale, "
-                    f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
-                    f"THEN actual_sale_price * quantity ELSE 0 END), 0) AS gross_sales, "
-                    f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
-                    f"THEN (actual_sale_price - cost) * quantity ELSE 0 END), 0) AS profit, "
+                    f"COALESCE(SUM(actual_sale_price * ({self._SOLD_UNITS})), 0) AS gross_sales, "
+                    f"COALESCE(SUM((actual_sale_price - cost) * ({self._SOLD_UNITS})), 0) AS profit, "
                     f"COALESCE(AVG(actual_sale_price) FILTER (WHERE actual_sale_price > 0), 0) "
                     f"AS avg_sale_price, "
                     f"COALESCE(AVG(actual_sale_price - cost) FILTER (WHERE actual_sale_price > 0), 0) "
@@ -286,6 +303,101 @@ class InventoryItemTable(Table):
             "items_sold": int(row.get("items_sold", 0)),
             "by_category": by_category,
         }
+
+    @staticmethod
+    def _format_series_label(bucket: datetime, period: MetricsPeriod) -> str:
+        if period == "week":
+            return bucket.strftime("%b %d").replace(" 0", " ")
+        if period == "month":
+            return bucket.strftime("%b %Y")
+        return bucket.strftime("%Y")
+
+    def get_metrics_series_for_owner(
+        self,
+        owner_uuid: str,
+        period: MetricsPeriod = "month",
+    ) -> list[dict[str, Any]]:
+        trunc, step, bucket_count = _PERIOD_SERIES[period]
+        # trunc/step come from the fixed whitelist above — safe to inline.
+        # Sale timestamp: prefer sold_at, fall back to updated_at for legacy rows.
+        sale_ts = "COALESCE(sold_at, updated_at)"
+        sold_amount = f"actual_sale_price * ({self._SOLD_UNITS})"
+        profit_amount = f"(actual_sale_price - cost) * ({self._SOLD_UNITS})"
+        offset = f"({bucket_count} - 1) * interval '{step}'"
+
+        db = Database()
+        with db:
+            rows = (
+                db.execute(
+                    f"WITH buckets AS ("
+                    f"  SELECT generate_series("
+                    f"    date_trunc('{trunc}', now()) - {offset},"
+                    f"    date_trunc('{trunc}', now()),"
+                    f"    interval '{step}'"
+                    f"  ) AS bucket"
+                    f"), "
+                    f"sales AS ("
+                    f"  SELECT date_trunc('{trunc}', {sale_ts}) AS bucket, "
+                    f"    COALESCE(SUM({sold_amount}), 0) AS gross_sales, "
+                    f"    COALESCE(SUM({profit_amount}), 0) AS profit, "
+                    f"    COUNT(*) AS items_sold, "
+                    f"    COALESCE(AVG(actual_sale_price), 0) AS avg_sale_price, "
+                    f"    COALESCE(SUM(CASE WHEN payment_method = 'cash' "
+                    f"      THEN {sold_amount} ELSE 0 END), 0) AS cash, "
+                    f"    COALESCE(SUM(CASE WHEN payment_method = 'venmo' "
+                    f"      THEN {sold_amount} ELSE 0 END), 0) AS venmo, "
+                    f"    COALESCE(SUM(CASE WHEN payment_method = 'paypal' "
+                    f"      THEN {sold_amount} ELSE 0 END), 0) AS paypal, "
+                    f"    COALESCE(SUM(CASE WHEN payment_method = 'facebook_pay' "
+                    f"      THEN {sold_amount} ELSE 0 END), 0) AS facebook_pay, "
+                    f"    COALESCE(SUM(CASE WHEN payment_method IS NULL "
+                    f"      OR payment_method = '' THEN {sold_amount} ELSE 0 END), 0) AS unknown "
+                    f"  FROM {self.fully_qualified_name} "
+                    f"  WHERE owner_uuid = %s AND {self._ACTIVE_FILTER} "
+                    f"    AND actual_sale_price > 0 "
+                    f"    AND {sale_ts} >= date_trunc('{trunc}', now()) - {offset} "
+                    f"  GROUP BY 1"
+                    f") "
+                    f"SELECT b.bucket, "
+                    f"  COALESCE(s.gross_sales, 0) AS gross_sales, "
+                    f"  COALESCE(s.profit, 0) AS profit, "
+                    f"  COALESCE(s.items_sold, 0) AS items_sold, "
+                    f"  COALESCE(s.avg_sale_price, 0) AS avg_sale_price, "
+                    f"  COALESCE(s.cash, 0) AS cash, "
+                    f"  COALESCE(s.venmo, 0) AS venmo, "
+                    f"  COALESCE(s.paypal, 0) AS paypal, "
+                    f"  COALESCE(s.facebook_pay, 0) AS facebook_pay, "
+                    f"  COALESCE(s.unknown, 0) AS unknown "
+                    f"FROM buckets b "
+                    f"LEFT JOIN sales s ON s.bucket = b.bucket "
+                    f"ORDER BY b.bucket",
+                    params=(owner_uuid,),
+                    fetch=True,
+                )
+                or []
+            )
+
+        series: list[dict[str, Any]] = []
+        for row in rows:
+            bucket = row["bucket"]
+            series.append(
+                {
+                    "bucket": bucket.isoformat() if hasattr(bucket, "isoformat") else str(bucket),
+                    "label": self._format_series_label(bucket, period),
+                    "gross_sales": float(row["gross_sales"]),
+                    "profit": float(row["profit"]),
+                    "items_sold": int(row["items_sold"]),
+                    "avg_sale_price": float(row["avg_sale_price"]),
+                    "by_payment_method": {
+                        "cash": float(row["cash"]),
+                        "venmo": float(row["venmo"]),
+                        "paypal": float(row["paypal"]),
+                        "facebook_pay": float(row["facebook_pay"]),
+                        "unknown": float(row["unknown"]),
+                    },
+                }
+            )
+        return series
 
     def get_all_for_owner(self, owner_uuid: str, search: str | None = None) -> list[dict[str, Any]]:
         db = Database()
@@ -329,6 +441,10 @@ class InventoryItemTable(Table):
         cost: float,
         projected_sale_price: float,
         actual_sale_price: float | None = None,
+        partial_sale: bool = False,
+        units_sold: int | None = None,
+        payment_method: str | None = None,
+        sold_at: datetime | None = None,
         image_urls: list[str] | None = None,
         category: str = "",
         condition: str = "",
@@ -359,6 +475,10 @@ class InventoryItemTable(Table):
                         "cost": cost,
                         "projected_sale_price": projected_sale_price,
                         "actual_sale_price": actual_sale_price,
+                        "partial_sale": partial_sale,
+                        "units_sold": units_sold,
+                        "payment_method": payment_method,
+                        "sold_at": sold_at,
                         "image_urls": image_urls or [],
                         "ai_evidence": ai_evidence,
                         "analysis_status": analysis_status,
