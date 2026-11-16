@@ -149,6 +149,12 @@ struct InventoryDetailView: View {
                 "Actual sale",
                 item.actualSalePrice.map(MoneyFormat.string) ?? "—"
             )
+            if item.partialSale, let unitsSold = item.unitsSold {
+                metric("Units sold", "\(unitsSold) of \(item.quantity)")
+            }
+            if let paymentMethod = item.paymentMethod {
+                metric("Payment", paymentMethod.label)
+            }
         }
     }
 

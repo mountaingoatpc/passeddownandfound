@@ -160,6 +160,9 @@ class InventoryItemTable(Table):
         Column(name="cost", column_type=ColumnType.REAL, nullable=False, default="0"),
         Column(name="projected_sale_price", column_type=ColumnType.REAL, nullable=False, default="0"),
         Column(name="actual_sale_price", column_type=ColumnType.REAL, nullable=True),
+        Column(name="partial_sale", column_type=ColumnType.BOOLEAN, nullable=False, default="false"),
+        Column(name="units_sold", column_type=ColumnType.INTEGER, nullable=True),
+        Column(name="payment_method", column_type=ColumnType.TEXT, nullable=True),
         Column(name="image_url", column_type=ColumnType.TEXT, nullable=True),
         Column(name="image_urls", column_type=ColumnType.JSONB, nullable=False, default="'[]'"),
         Column(name="ai_evidence", column_type=ColumnType.JSONB, nullable=True),
@@ -226,6 +229,13 @@ class InventoryItemTable(Table):
                 or []
             )
 
+    # Units counted toward a recorded sale: full quantity, or units_sold when partial.
+    _SOLD_UNITS = (
+        "CASE WHEN actual_sale_price > 0 THEN "
+        "CASE WHEN partial_sale THEN COALESCE(units_sold, 0) ELSE quantity END "
+        "ELSE 0 END"
+    )
+
     def get_metrics_for_owner(self, owner_uuid: str) -> dict[str, Any]:
         db = Database()
         with db:
@@ -234,10 +244,8 @@ class InventoryItemTable(Table):
                 f"COUNT(*) AS total_items, "
                 f"COALESCE(SUM(cost * quantity), 0) AS total_cost, "
                 f"COALESCE(SUM(projected_sale_price * quantity), 0) AS total_projected_sale, "
-                f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
-                f"THEN actual_sale_price * quantity ELSE 0 END), 0) AS gross_sales, "
-                f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
-                f"THEN (actual_sale_price - cost) * quantity ELSE 0 END), 0) AS profit, "
+                f"COALESCE(SUM(actual_sale_price * ({self._SOLD_UNITS})), 0) AS gross_sales, "
+                f"COALESCE(SUM((actual_sale_price - cost) * ({self._SOLD_UNITS})), 0) AS profit, "
                 f"COALESCE(AVG(actual_sale_price) FILTER (WHERE actual_sale_price > 0), 0) "
                 f"AS avg_sale_price, "
                 f"COALESCE(AVG(actual_sale_price - cost) FILTER (WHERE actual_sale_price > 0), 0) "
@@ -254,10 +262,8 @@ class InventoryItemTable(Table):
                     f"COALESCE(NULLIF(TRIM(category), ''), %s) AS category, "
                     f"COALESCE(SUM(cost * quantity), 0) AS cost, "
                     f"COALESCE(SUM(projected_sale_price * quantity), 0) AS projected_sale, "
-                    f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
-                    f"THEN actual_sale_price * quantity ELSE 0 END), 0) AS gross_sales, "
-                    f"COALESCE(SUM(CASE WHEN actual_sale_price > 0 "
-                    f"THEN (actual_sale_price - cost) * quantity ELSE 0 END), 0) AS profit, "
+                    f"COALESCE(SUM(actual_sale_price * ({self._SOLD_UNITS})), 0) AS gross_sales, "
+                    f"COALESCE(SUM((actual_sale_price - cost) * ({self._SOLD_UNITS})), 0) AS profit, "
                     f"COALESCE(AVG(actual_sale_price) FILTER (WHERE actual_sale_price > 0), 0) "
                     f"AS avg_sale_price, "
                     f"COALESCE(AVG(actual_sale_price - cost) FILTER (WHERE actual_sale_price > 0), 0) "
@@ -329,6 +335,9 @@ class InventoryItemTable(Table):
         cost: float,
         projected_sale_price: float,
         actual_sale_price: float | None = None,
+        partial_sale: bool = False,
+        units_sold: int | None = None,
+        payment_method: str | None = None,
         image_urls: list[str] | None = None,
         category: str = "",
         condition: str = "",
@@ -359,6 +368,9 @@ class InventoryItemTable(Table):
                         "cost": cost,
                         "projected_sale_price": projected_sale_price,
                         "actual_sale_price": actual_sale_price,
+                        "partial_sale": partial_sale,
+                        "units_sold": units_sold,
+                        "payment_method": payment_method,
                         "image_urls": image_urls or [],
                         "ai_evidence": ai_evidence,
                         "analysis_status": analysis_status,

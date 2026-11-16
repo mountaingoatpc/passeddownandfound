@@ -100,6 +100,9 @@ def _serialize_item(row: dict) -> InventoryItemResponse:
         cost=float(row["cost"]),
         projected_sale_price=float(row["projected_sale_price"]),
         actual_sale_price=float(row["actual_sale_price"]) if row["actual_sale_price"] is not None else None,
+        partial_sale=bool(row.get("partial_sale") or False),
+        units_sold=int(row["units_sold"]) if row.get("units_sold") is not None else None,
+        payment_method=row.get("payment_method"),
         image_urls=_serialize_image_urls(row),
         ai_evidence=_serialize_ai_evidence(row.get("ai_evidence")),
         analysis_status=row.get("analysis_status") or "none",
@@ -511,6 +514,9 @@ async def create_inventory_item(
         cost=request.cost,
         projected_sale_price=request.projected_sale_price,
         actual_sale_price=request.actual_sale_price,
+        partial_sale=request.partial_sale,
+        units_sold=request.units_sold,
+        payment_method=request.payment_method,
         image_urls=request.image_urls,
         ai_evidence=request.ai_evidence.model_dump() if request.ai_evidence else None,
         analysis_status=analysis_status,
@@ -557,6 +563,30 @@ async def update_inventory_item(
 
     run_analysis = updates.pop("run_analysis", None)
     analysis_context = updates.pop("analysis_context", None)
+
+    sale_fields = {"partial_sale", "units_sold", "quantity"}
+    if sale_fields & updates.keys():
+        existing = inventory_table.get_by_uuid(item_uuid, current_user["uuid"])
+        if not existing:
+            raise HTTPException(status_code=404, detail="Item not found")
+        partial_sale = updates.get("partial_sale", bool(existing.get("partial_sale") or False))
+        quantity = int(updates.get("quantity", existing.get("quantity") or 1))
+        units_sold = updates.get(
+            "units_sold",
+            int(existing["units_sold"]) if existing.get("units_sold") is not None else None,
+        )
+        if partial_sale:
+            if units_sold is None:
+                raise HTTPException(status_code=400, detail="units_sold is required for a partial sale")
+            if units_sold < 1:
+                raise HTTPException(status_code=400, detail="units_sold must be at least 1")
+            if units_sold > quantity:
+                raise HTTPException(status_code=400, detail="units_sold cannot exceed quantity")
+            updates["units_sold"] = units_sold
+            updates["partial_sale"] = True
+        else:
+            updates["partial_sale"] = False
+            updates["units_sold"] = None
 
     result = inventory_table.update(item_uuid, current_user["uuid"], updates)
     if not result:

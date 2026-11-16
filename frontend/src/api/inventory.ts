@@ -8,6 +8,18 @@ export type AnalysisStatus =
 	| "complete"
 	| "failed";
 
+export type PaymentMethod = "cash" | "venmo" | "paypal" | "facebook_pay";
+
+export const PAYMENT_METHOD_OPTIONS: {
+	value: PaymentMethod;
+	label: string;
+}[] = [
+	{ value: "cash", label: "Cash" },
+	{ value: "venmo", label: "Venmo" },
+	{ value: "paypal", label: "PayPal" },
+	{ value: "facebook_pay", label: "Facebook Pay" },
+];
+
 export interface InventoryItem {
 	uuid: string;
 	name: string;
@@ -21,6 +33,9 @@ export interface InventoryItem {
 	cost: number;
 	projected_sale_price: number;
 	actual_sale_price: number | null;
+	partial_sale: boolean;
+	units_sold: number | null;
+	payment_method: PaymentMethod | null;
 	image_urls: string[];
 	ai_evidence: ItemAiEvidence | null;
 	analysis_status: AnalysisStatus;
@@ -92,6 +107,9 @@ export interface CreateInventoryItemData {
 	cost: number;
 	projected_sale_price: number;
 	actual_sale_price?: number | null;
+	partial_sale?: boolean;
+	units_sold?: number | null;
+	payment_method?: PaymentMethod | null;
 	image_urls?: string[];
 	ai_evidence?: ItemAiEvidence | null;
 	run_analysis?: boolean;

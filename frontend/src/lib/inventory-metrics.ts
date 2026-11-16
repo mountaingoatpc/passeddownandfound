@@ -34,6 +34,22 @@ export interface CategoryMetricRow {
 
 const UNCATEGORIZED_LABEL = "Uncategorized";
 
+/** Units counted toward a recorded sale (full quantity, or units_sold when partial). */
+export function getSoldUnits(item: {
+	quantity: number;
+	partial_sale?: boolean;
+	units_sold?: number | null;
+	actual_sale_price: number | null;
+}): number {
+	if (item.actual_sale_price == null || item.actual_sale_price <= 0) {
+		return 0;
+	}
+	if (item.partial_sale) {
+		return item.units_sold ?? 0;
+	}
+	return item.quantity || 1;
+}
+
 /** Realized profit only when an actual sale > 0 has been recorded. */
 export function getItemProfit(item: {
 	cost: number;
@@ -62,12 +78,13 @@ export function computeInventoryMetrics(
 
 	for (const item of items) {
 		const quantity = item.quantity || 1;
+		const soldUnits = getSoldUnits(item);
 		totalCost += item.cost * quantity;
 		totalProjectedSale += item.projected_sale_price * quantity;
 		const itemProfit = getItemProfit(item);
-		if (itemProfit != null && item.actual_sale_price != null) {
-			grossSales += item.actual_sale_price * quantity;
-			profit += itemProfit * quantity;
+		if (itemProfit != null && item.actual_sale_price != null && soldUnits > 0) {
+			grossSales += item.actual_sale_price * soldUnits;
+			profit += itemProfit * soldUnits;
 			salePriceSum += item.actual_sale_price;
 			unitProfitSum += itemProfit;
 			itemsSold += 1;
@@ -106,6 +123,7 @@ export function computeCategoryMetrics(
 	for (const item of items) {
 		const category = item.category.trim() || UNCATEGORIZED_LABEL;
 		const quantity = item.quantity || 1;
+		const soldUnits = getSoldUnits(item);
 		const cost = item.cost * quantity;
 		const projectedSale = item.projected_sale_price * quantity;
 		const itemProfit = getItemProfit(item);
@@ -119,7 +137,8 @@ export function computeCategoryMetrics(
 			itemsSold: 0,
 		};
 
-		const sold = itemProfit != null && item.actual_sale_price != null;
+		const sold =
+			itemProfit != null && item.actual_sale_price != null && soldUnits > 0;
 
 		byCategory.set(category, {
 			cost: existing.cost + cost,
@@ -127,15 +146,16 @@ export function computeCategoryMetrics(
 			grossSales:
 				existing.grossSales +
 				(sold && item.actual_sale_price != null
-					? item.actual_sale_price * quantity
+					? item.actual_sale_price * soldUnits
 					: 0),
 			profit:
-				existing.profit + (itemProfit != null ? itemProfit * quantity : 0),
+				existing.profit +
+				(itemProfit != null && sold ? itemProfit * soldUnits : 0),
 			salePriceSum:
 				existing.salePriceSum +
 				(sold && item.actual_sale_price != null ? item.actual_sale_price : 0),
 			unitProfitSum:
-				existing.unitProfitSum + (itemProfit != null ? itemProfit : 0),
+				existing.unitProfitSum + (itemProfit != null && sold ? itemProfit : 0),
 			itemsSold: existing.itemsSold + (sold ? 1 : 0),
 		});
 	}
