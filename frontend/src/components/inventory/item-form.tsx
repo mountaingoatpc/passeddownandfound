@@ -174,7 +174,9 @@ export function ItemForm({
 				: null,
 			partial_sale: partialSale,
 			units_sold:
-				partialSale && Number.isFinite(parsedUnitsSold) ? parsedUnitsSold : null,
+				partialSale && Number.isFinite(parsedUnitsSold)
+					? parsedUnitsSold
+					: null,
 			payment_method: paymentMethod || null,
 			images,
 			aiEvidence: hasAiEvidence(aiEvidence) ? aiEvidence : null,
