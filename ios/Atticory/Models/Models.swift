@@ -160,6 +160,7 @@ struct InventoryItem: Codable, Identifiable, Equatable, Sendable {
     var partialSale: Bool
     var unitsSold: Int?
     var paymentMethod: PaymentMethod?
+    var soldAt: String?
     var imageUrls: [String]
     var aiEvidence: ItemAiEvidence?
     var analysisStatus: AnalysisStatus
@@ -178,6 +179,7 @@ struct InventoryItem: Codable, Identifiable, Equatable, Sendable {
         case partialSale = "partial_sale"
         case unitsSold = "units_sold"
         case paymentMethod = "payment_method"
+        case soldAt = "sold_at"
         case imageUrls = "image_urls"
         case aiEvidence = "ai_evidence"
         case analysisStatus = "analysis_status"
@@ -204,6 +206,7 @@ struct InventoryItem: Codable, Identifiable, Equatable, Sendable {
         partialSale = try container.decodeIfPresent(Bool.self, forKey: .partialSale) ?? false
         unitsSold = try container.decodeIfPresent(Int.self, forKey: .unitsSold)
         paymentMethod = try container.decodeIfPresent(PaymentMethod.self, forKey: .paymentMethod)
+        soldAt = try container.decodeIfPresent(String.self, forKey: .soldAt)
         imageUrls = try container.decodeIfPresent([String].self, forKey: .imageUrls) ?? []
         aiEvidence = try container.decodeIfPresent(ItemAiEvidence.self, forKey: .aiEvidence)
         analysisStatus = try container.decodeIfPresent(AnalysisStatus.self, forKey: .analysisStatus) ?? .none

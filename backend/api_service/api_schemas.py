@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 PaymentMethod = Literal["cash", "venmo", "paypal", "facebook_pay"]
+MetricsPeriod = Literal["week", "month", "year"]
 
 
 class RegisterRequest(BaseModel):
@@ -180,6 +181,24 @@ class CategoryMetricRow(BaseModel):
     avg_profit: float
 
 
+class PaymentMethodSales(BaseModel):
+    cash: float = 0
+    venmo: float = 0
+    paypal: float = 0
+    facebook_pay: float = 0
+    unknown: float = 0
+
+
+class MetricsSeriesPoint(BaseModel):
+    bucket: str
+    label: str
+    gross_sales: float
+    profit: float
+    items_sold: int
+    avg_sale_price: float
+    by_payment_method: PaymentMethodSales
+
+
 class InventoryMetricsResponse(BaseModel):
     total_items: int
     total_cost: float
@@ -191,6 +210,8 @@ class InventoryMetricsResponse(BaseModel):
     avg_profit: float
     items_sold: int
     by_category: list[CategoryMetricRow]
+    period: MetricsPeriod = "month"
+    series: list[MetricsSeriesPoint] = Field(default_factory=list)
 
 
 class InventoryItemResponse(BaseModel):
@@ -209,6 +230,7 @@ class InventoryItemResponse(BaseModel):
     partial_sale: bool = False
     units_sold: int | None = None
     payment_method: PaymentMethod | None = None
+    sold_at: str | None = None
     image_urls: list[str]
     ai_evidence: ItemAiEvidence | None = None
     analysis_status: str

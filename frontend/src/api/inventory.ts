@@ -10,6 +10,8 @@ export type AnalysisStatus =
 
 export type PaymentMethod = "cash" | "venmo" | "paypal" | "facebook_pay";
 
+export type MetricsPeriod = "week" | "month" | "year";
+
 export const PAYMENT_METHOD_OPTIONS: {
 	value: PaymentMethod;
 	label: string;
@@ -18,6 +20,15 @@ export const PAYMENT_METHOD_OPTIONS: {
 	{ value: "venmo", label: "Venmo" },
 	{ value: "paypal", label: "PayPal" },
 	{ value: "facebook_pay", label: "Facebook Pay" },
+];
+
+export const METRICS_PERIOD_OPTIONS: {
+	value: MetricsPeriod;
+	label: string;
+}[] = [
+	{ value: "week", label: "Week" },
+	{ value: "month", label: "Month" },
+	{ value: "year", label: "Year" },
 ];
 
 export interface InventoryItem {
@@ -36,6 +47,7 @@ export interface InventoryItem {
 	partial_sale: boolean;
 	units_sold: number | null;
 	payment_method: PaymentMethod | null;
+	sold_at: string | null;
 	image_urls: string[];
 	ai_evidence: ItemAiEvidence | null;
 	analysis_status: AnalysisStatus;
@@ -76,6 +88,24 @@ export interface InventoryMetricsCategoryRow {
 	avg_profit: number;
 }
 
+export interface PaymentMethodSales {
+	cash: number;
+	venmo: number;
+	paypal: number;
+	facebook_pay: number;
+	unknown: number;
+}
+
+export interface MetricsSeriesPoint {
+	bucket: string;
+	label: string;
+	gross_sales: number;
+	profit: number;
+	items_sold: number;
+	avg_sale_price: number;
+	by_payment_method: PaymentMethodSales;
+}
+
 export interface InventoryMetricsResponse {
 	total_items: number;
 	total_cost: number;
@@ -87,6 +117,8 @@ export interface InventoryMetricsResponse {
 	avg_profit: number;
 	items_sold: number;
 	by_category: InventoryMetricsCategoryRow[];
+	period: MetricsPeriod;
+	series: MetricsSeriesPoint[];
 }
 
 export interface InventoryListParams {
@@ -164,8 +196,17 @@ export const inventoryApi = {
 		);
 	},
 
-	async metrics(): Promise<InventoryMetricsResponse> {
-		return fetchApi<InventoryMetricsResponse>("/inventory/metrics");
+	async metrics(
+		params: { period?: MetricsPeriod } = {},
+	): Promise<InventoryMetricsResponse> {
+		const searchParams = new URLSearchParams();
+		if (params.period) {
+			searchParams.set("period", params.period);
+		}
+		const query = searchParams.toString();
+		return fetchApi<InventoryMetricsResponse>(
+			`/inventory/metrics${query ? `?${query}` : ""}`,
+		);
 	},
 
 	async get(uuid: string): Promise<InventoryItem> {
